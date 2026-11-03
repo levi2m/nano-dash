@@ -1,8 +1,13 @@
 # Nano Dash
 
+[![ci](https://github.com/levi2m/nano-dash/actions/workflows/ci.yml/badge.svg)](https://github.com/levi2m/nano-dash/actions/workflows/ci.yml)
+
 Ride logger for the DJI Osmo Nano on a motorcycle. It starts and stops the camera over Bluetooth with your ride, logs GPS and motion on the phone, and writes a `.fit` file that DJI Mimo can attach to the footage as speed, route and elevation overlays. No Mimo "sports training" session is needed, and the phone can stay locked in your pocket.
 
+> [!WARNING]
 > Unofficial. Not affiliated with, endorsed by or sponsored by DJI or Garmin. Not for safety-critical use. Never operate your phone while riding: start the ride before you move off.
+
+<img src="docs/screenshot.jpg" width="280" alt="The Nano Dash main screen, ready to start a ride">
 
 ## What it does
 
@@ -21,7 +26,7 @@ Works on a Samsung Galaxy S25 Ultra with one Osmo Nano: three real rides importe
 
 ## How to use
 
-1. Install the APK, allow location, Bluetooth and notifications.
+1. Install the APK from the [latest release](https://github.com/levi2m/nano-dash/releases/latest), allow location, Bluetooth and notifications.
 2. Turn the camera on with its wireless connection enabled, close Mimo on the phone, and tap Connect camera. The first time, approve the phone on the camera's screen.
 3. Wait for the GPS row to show a fix, then tap Start ride and put the phone away.
 4. Tap Stop ride (or Stop in the notification) when you arrive, and wait for "Saved".
