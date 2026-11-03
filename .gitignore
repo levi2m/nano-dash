@@ -1,0 +1,26 @@
+# Large or private files that must never be committed
+footage/
+tools/ble-spike/trials/
+*.fit
+*.MP4
+*.mp4
+*.WAV
+*.LRF
+
+# Internal worklog (personal data), build artifacts, locally installed third-party skills
+PLAN.md
+dist/
+.claude/
+skills-lock.json
+
+# Release signing: the keystore and its passwords never go into the repository
+android/keystore.properties
+*.jks
+*.keystore
+
+# Build output and local config
+android/.gradle/
+android/**/build/
+android/local.properties
+.idea/
+*.iml

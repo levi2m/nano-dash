@@ -1,0 +1,24 @@
+Nano Dash
+Copyright 2026 levi2m
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This project is an independent, unofficial tool. It is not affiliated with, endorsed by, or sponsored by DJI or Garmin.
+"DJI", "Osmo" and "Osmo Nano" are trademarks of their respective owners and are used here only to say which camera
+the software works with.
+
+Credits and sources
+-------------------
+* The Bluetooth command set and frame layout used to control the camera (DUML frames, pairing, wake, keepalive, record
+  start and stop) follow the protocol documentation of the Osmosis project, https://github.com/KonradIT/osmosis,
+  licensed under the MIT License. The camera's behaviour (timings, replies, error codes) was measured independently on a
+  real camera; see docs for the method. No code or documents from DJI's SDK are used or included.
+* The FIT file writer is written from the public FIT file-format description. It does not use or include Garmin's FIT
+  SDK. "FIT" and "Garmin" are trademarks of Garmin Ltd. or its subsidiaries.
+* Third-party libraries are used under their own licences: AndroidX and Jetpack Compose, Kotlin and kotlinx.coroutines
+  (Apache License 2.0).
+
+Safety
+------
+This software records data while you ride. It must not be used to operate a phone or camera while riding, and it is not
+intended for any safety-critical purpose. Provided "AS IS", without warranty of any kind (see LICENSE).

@@ -1,0 +1,51 @@
+# Nano Dash
+
+Ride logger for the DJI Osmo Nano on a motorcycle. It starts and stops the camera over Bluetooth with your ride, logs GPS and motion on the phone, and writes a `.fit` file that DJI Mimo can attach to the footage as speed, route and elevation overlays. No Mimo "sports training" session is needed, and the phone can stay locked in your pocket.
+
+> Unofficial. Not affiliated with, endorsed by or sponsored by DJI or Garmin. Not for safety-critical use. Never operate your phone while riding: start the ride before you move off.
+
+## What it does
+
+- Finds and pairs the camera, then starts and stops it with the ride. If the link drops it reconnects in the background and still stops the camera at the end. A camera that becomes ready after the ride started joins late.
+- Sets the camera's clock to the phone's every time it connects, so the clips and the `.fit` share one time. This changes the camera's real date and time; the app warns if the phone's automatic time is off.
+- Logs the ride with the screen off: GPS at 1 Hz, motion sensors at about 45 Hz, pressure.
+- Writes the `.fit` with the same record fields as Mimo's own export, on real timestamps, plus developer fields (lean angle, lateral and longitudinal acceleration, camera recording flag) estimated from the GPS track.
+- Controls several Nanos at once ("Choose cameras"). With cameras whose clocks differ, each gets its own `ride-<camera>.fit`.
+- Keeps everything on the phone. The app has no internet permission, and rides leave only when you tap Share.
+
+Only Mimo draws the overlays, so Mimo is needed once, at the end, to import the `.fit` with the clip.
+
+## Status
+
+Works on a Samsung Galaxy S25 Ultra with one Osmo Nano: three real rides imported in Mimo and lined up with their clips. Not yet proven on a real ride: the 360 ms clock offset on the phone's Bluetooth, two cameras at once, and rides longer than about ten minutes with the screen off. Other DJI cameras are untested. See [ROADMAP.md](ROADMAP.md).
+
+## How to use
+
+1. Install the APK, allow location, Bluetooth and notifications.
+2. Turn the camera on with its wireless connection enabled, close Mimo on the phone, and tap Connect camera. The first time, approve the phone on the camera's screen.
+3. Wait for the GPS row to show a fix, then tap Start ride and put the phone away.
+4. Tap Stop ride (or Stop in the notification) when you arrive, and wait for "Saved".
+5. Tap Share .fit on the ride, and in Mimo import the `.fit` together with the clip.
+
+Rides live in the app's private storage and are deleted with the app, so share the ones you want to keep.
+
+## Build
+
+Needs JDK 21 and the Android SDK (platform 37). From `android/`:
+
+```
+./gradlew :core:test :app:assembleDebug
+```
+
+The `core` module (camera protocol, FIT writer, ride assembly) is plain Kotlin with no Android dependency, so its tests run on any JVM, with a fake Nano that reproduces the real camera's timings.
+
+## Documents
+
+- [docs/PROTOCOL.md](docs/PROTOCOL.md): what we confirmed about the Nano's Bluetooth control
+- [docs/SYNC.md](docs/SYNC.md): how the `.fit` is lined up with the video, and how that was measured
+- [docs/FIT.md](docs/FIT.md): what the `.fit` and a ride folder contain
+- [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## Licence
+
+Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). The camera protocol notes build on [Osmosis](https://github.com/KonradIT/osmosis) (MIT).
