@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    concurrency:
+      group: build-${{ github.ref }}   # runs on one branch queue, so releases publish in order
+      cancel-in-progress: false
     env:
       # Signing and publishing switch on only when the key is stored as a repository secret.
       RELEASE: ${{ secrets.KEYSTORE_B64 != '' }}
