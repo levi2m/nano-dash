@@ -2,6 +2,7 @@ name: ci
 
 on:
   push:
+    paths: [android/**, .github/workflows/**]   # docs-only pushes need no build or release
   pull_request:
 
 permissions:
