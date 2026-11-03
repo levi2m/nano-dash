@@ -17,7 +17,7 @@ android {
         applicationId = "io.github.levi2m.nanodash"   // fixed once published; the Kotlin namespace above is separate and can stay
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1   // CI passes its run number so every release is newer
         versionName = "0.1.0"
     }
 

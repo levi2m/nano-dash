@@ -5,11 +5,17 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write   # to publish releases; pull requests from forks still get a read-only token
 
 jobs:
   build:
     runs-on: ubuntu-24.04
+    env:
+      # Signing and publishing switch on only when the key is stored as a repository secret.
+      RELEASE: ${{ secrets.KEYSTORE_B64 != '' }}
+      KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     defaults:
       run:
         working-directory: android
@@ -24,5 +30,20 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Release key
+        if: env.RELEASE == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=nanodash\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/release.jks" "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" > keystore.properties
+          echo SIGNED=1 >> "$GITHUB_ENV"
       - name: Test, lint and build
-        run: ./gradlew :core:test :app:lintDebug :app:assembleDebug :app:assembleRelease --console=plain
+        run: ./gradlew :core:test :app:lintDebug :app:assembleDebug :app:assembleRelease -PversionCode=${{ github.run_number }} --console=plain
+      - name: Publish release
+        if: env.SIGNED
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk "nano-dash-$tag.apk"
+          gh release create "$tag" "nano-dash-$tag.apk" --target "$GITHUB_SHA" --generate-notes

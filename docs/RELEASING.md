@@ -1,5 +1,12 @@
 # Releasing
 
+**Automatic:** once the three secrets below exist, every push to `main` that passes CI publishes a signed release `v<versionName>-<run number>` (the run number is also the `versionCode`). Add them in the repository's Settings → Secrets and variables → Actions, or with `gh secret set`:
+
+- `KEYSTORE_B64`: the keystore from step 1, as base64 (`base64 -w0 nano-dash-release.jks`)
+- `KEYSTORE_PASSWORD` and `KEY_PASSWORD`: its passwords (the key alias must be `nanodash`)
+
+Without them CI only tests and builds. Steps 2–5 below are the manual route, still valid.
+
 1. **Once: make the release key** (keep it and its passwords outside the repository, and back it up; losing it means no update can ever install over a release):
 
    ```
