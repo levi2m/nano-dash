@@ -15,8 +15,8 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 2. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger.
 3. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing.
 4. **Robustness:** rebuild a missing `.fit` automatically on launch, a first-run prompt for battery optimisation on Samsung and similar phones, an "export all rides" action (rides are removed with the app), `format_version` in `meta.json`, target API 37, and checks of the light theme, large fonts, TalkBack and landscape.
-5. **Engineering:** done: version catalog, R8 release build (signed once `android/keystore.properties` exists), a GitHub Actions workflow (written, not run yet), and the testable app logic moved into `core` (80 tests). Left: only if a concrete problem appears, split `LoggerService` or add a ViewModel.
-6. **Publish:** a fresh git repository (not this folder's history), `PLAN.md` kept out, a signed APK on GitHub, then F-Droid. Google Play is probably not happening.
+5. **Engineering:** done: version catalog, R8 release build (signed once `android/keystore.properties` exists), a GitHub Actions workflow that tests every push and publishes a signed release from `main`, and the testable app logic moved into `core` (80 tests). Left: only if a concrete problem appears, split `LoggerService` or add a ViewModel.
+6. **Publish:** done: private repository, signed release on every push to `main`. Left: make it public after the first ride, then F-Droid. Google Play is probably not happening.
 7. **The merge tool:** combine the camera's own orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`. The camera is rigid on the bike, so it is the better lean source; the GPS estimate stays as the fallback.
 8. **Wear OS companion**, after the phone app is finished: a second GPS source and a start/stop remote, with the phone still holding the camera link.
 
@@ -30,8 +30,8 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 
 - [x] Licence Apache-2.0; `NOTICE` credits Osmosis and states the project is unofficial.
 - [x] Safety wording in the README and `NOTICE`; no DJI SDK or Garmin SDK material in the tree.
-- [ ] Fresh `git init`; keep `PLAN.md`, `footage/`, `*.fit`, `*.mp4` and trial logs out; search the tree for personal data before the first commit.
-- [ ] Python tools in `tools/`: short README, no personal paths.
-- [ ] Signed release APK; the release keystore backed up by the maintainer (losing it means no update can install over the release).
+- [x] Fresh `git init`; keep `PLAN.md`, `footage/`, `*.fit`, `*.mp4` and trial logs out; search the tree for personal data before the first commit.
+- [x] Python tools in `tools/`: short README, no personal paths.
+- [x] Signed release APK (built by CI); the release keystore backed up by the maintainer (losing it means no update can install over the release).
 - [ ] F-Droid: reproducible build, free-software dependencies only (true now).
 - [ ] Application id `io.github.levi2m.nanodash`, fixed once published.
