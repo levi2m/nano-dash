@@ -109,3 +109,39 @@ No new process, no new permission, no new network use. The only new code is in h
 - That the **watch** (a Galaxy Watch6 Classic, with Samsung's Galaxy Wearable companion) mirrors the notification and shows the Start and Stop buttons.
 - That a ride started this way receives real GPS fixes outdoors. The test was indoors, so it proved the service starts and registers for location, not that fixes arrive.
 - The behaviour on other phones: Android's rules for starting a foreground service from a notification are the same across versions, but manufacturers differ.
+
+## 11. Decision: a real watch app over our own Bluetooth link
+
+The notification route was tried first (build 36). On the Galaxy Watch6 Classic nothing showed up on the watch, and a notification is a poor remote anyway: it is buried on a watch. So the roadmap item becomes a watch app. The choices, made with the maintainer:
+
+- **Transport:** our own Bluetooth link, not Google's Data Layer. The phone app keeps no Google dependency and stays F-Droid-clean.
+- **Watch app:** one screen with Start and Stop, the ride state, and a tile for one-swipe access.
+- **Installing it:** a second APK in each GitHub release, installed on the watch over wireless debugging. F-Droid cannot install onto a watch.
+
+### How the link works
+
+The watch and the phone are already paired by Bluetooth. The phone opens a **secure RFCOMM** service (a Bluetooth serial channel) with the fixed id `a3286e7a-3551-4008-abcb-d4c7c9fbf582`. "Secure" means Android encrypts and authenticates it with the existing pairing, so no new secret is needed. The watch connects to it.
+
+- **Only the user's watch is accepted.** In the phone app the user picks which paired device is their watch. Any other device that connects is closed at once.
+- **Protocol:** text lines, at most 128 bytes, each ended by a newline. The watch sends `HELLO 1`, `STATUS`, `START` and `STOP`. The phone answers `OK` or `ERR <reason>` and sends `STATE <ride> <seconds> <gps> <camera>` when something changes and every 2 seconds while a ride runs. Unknown lines are ignored. A line over the limit closes the connection.
+- **The same protocol code** (in `core`) is used by both apps, so they cannot drift apart.
+
+### Why the phone service has an "armed" mode
+
+The phone has to be listening while the app is closed, and Android does not let an app start a location service from the background on its own. The quick-start test showed a notification button is allowed, but a Bluetooth message is not on that list. So the phone starts its ride service **while the app is on screen** (when the user switches "Watch remote" on), and that service waits in an armed state: a foreground notification, the Bluetooth listener, and no GPS or sensors. A Start from the watch then only changes the state of a service that is already running, so no new foreground service has to be started from the background. Stop returns it to armed. Switching it off stops the service.
+
+Cost: one quiet notification while it is on, and it must be switched on again after a restart of the phone.
+
+### Safety on the watch
+
+- Stop needs a **press and hold**, so a stray tap cannot end a ride.
+- Start is a single tap.
+- If the phone is out of reach, the watch shows "Phone not reachable" and does nothing else.
+
+### Milestones
+
+1. **Spike:** the smallest watch app that connects to the phone and gets a reply. Proves the Galaxy Watch allows the link. Nothing else is built until this works.
+2. Armed mode and the Bluetooth listener on the phone, with the protocol in `core` and its tests.
+3. The watch screen: Start, Stop (hold), state.
+4. The tile.
+5. CI builds and releases both APKs; the docs and the roadmap follow.
