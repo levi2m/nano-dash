@@ -57,7 +57,7 @@ Starting with no camera is allowed (state 3), exactly as on the phone: the ride 
       .-----------.                 .-----------.                 .-----------.
      /  o Camera   \               / o GPS  o Cam \              /             \
     |    ready      |             |   fix  recording|            |    12:45     |
-    |               |             |               |             |   (dimmed)    |
+    |               |             |               |             |                |
     |     Ready     |             |    12:45      |             |               |
     |               |             |   (ember)     |             |   fills red   |
      \ [ Start ride ]/             \ [Hold to stop]/             \ [#### stop  ]/

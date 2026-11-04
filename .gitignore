@@ -24,3 +24,5 @@ android/**/build/
 android/local.properties
 .idea/
 *.iml
+
+graphify-out/
