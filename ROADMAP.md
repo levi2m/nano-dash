@@ -14,12 +14,23 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 ## Next
 
 1. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger. The ride list now shows the longest wait between GPS fixes; a gap of minutes means the phone paused the app.
-2. **F-Droid**, in progress: F-Droid builds from source and signs with its own key, so a GitHub APK and an F-Droid APK cannot update over each other. Needs its metadata file and a clean build check. Google Play is probably not happening.
-3. **Wear OS remote:** design in [docs/WEAR_OS.md](docs/WEAR_OS.md). First a spike on the real watch to see whether the existing Stop notification action already mirrors; a watch app only if it does not.
+2. **F-Droid**, in progress: F-Droid builds from source and signs with its own key, so a GitHub APK and an F-Droid APK cannot update over each other. Needs its metadata file and a clean build check. Google Play is a possible later step, see below.
+3. **Wear OS remote:** built as a phone-only feature (build 36): an opt-in "Quick start from the watch" notification with a Start button, plus the existing Stop button, both mirrored by the watch's notification bridge. Design and findings in [docs/WEAR_OS.md](docs/WEAR_OS.md). To confirm on a real watch; a watch app only if the mirroring is not enough.
 4. **The merge tool**, undecided: first check on a ride whether Mimo's lean and G widgets already work from the clip's own sensors. If they do, drop it. If not, combine the camera's orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`, keeping the GPS estimate as the fallback.
 5. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing. Waits for someone with two Nanos to file a compatibility report.
 6. **Robustness, what is left:** a first-run battery-optimisation prompt, only if the long ride shows a need.
 7. **Engineering:** nothing planned. Split `LoggerService` or add a ViewModel only if a concrete problem appears.
+
+## Possible later
+
+- **Google Play.** Not decided. It would need:
+  - A Play Console developer account (one-time fee, identity verification). A new personal account has to run a closed test with opted-in testers for 14 days before production; check the current tester count in Play Console.
+  - An Android App Bundle (`bundleRelease`) and Play App Signing. Play signs with its own key, so a Play install, a GitHub APK and an F-Droid install cannot update over each other.
+  - A Play build variant without the "Check for updates" button, because Play does not allow sending people elsewhere to download updates.
+  - Store assets (512 px icon, 1024x500 feature graphic, at least two phone screenshots), a privacy policy URL (`PRIVACY.md` works), and the declaration forms: Data safety, content rating, ads, target audience, and the foreground-service declarations for the location and connected-device types, with a short demo video.
+  - Care with the DJI name: nominative use only, no DJI logos, keep the unofficial disclaimer.
+  - A Wear OS listing only if a watch app is ever built. With the notification design in [docs/WEAR_OS.md](docs/WEAR_OS.md) there is no watch app to publish.
+- **Android developer verification.** Google is rolling out identity verification for developers whose apps install on certified phones, sideloaded ones included, with Brazil among the first countries (reported for 30 September 2026; dates differ between sources and need checking on Google's pages). Registering in the Android Developer Console may be needed for the GitHub APK to keep installing, whether or not the app goes on Play.
 
 ## Left out, and why
 

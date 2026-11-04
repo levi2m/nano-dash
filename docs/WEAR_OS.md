@@ -1,6 +1,6 @@
 # Wear OS remote: design
 
-Status: proposal, nothing built. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
+Status: Stage 1 and 1b are built (build 36, off by default). The watch side is still to be confirmed on a real watch. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
 
 ## 1. What is needed, and what is not
 
@@ -93,3 +93,19 @@ No new process, no new permission, no new network use. The only new code is in h
 
 1. Which watch, and does it already show the ride notification with a Stop button? (Stage 0.)
 2. Is Start from the wrist wanted, or is Stop enough?
+
+## 10. What was built and what was found (build 36)
+
+**Built:**
+- The ride notification is explicitly mirrorable (`setLocalOnly(false)`), and `ACTION_START` and `ACTION_STOP` are handled by name: a stray intent no longer starts a ride.
+- **Quick start from the watch** (off by default, a switch at the bottom of the screen): while it is on, a silent ongoing notification "Nano Dash is ready" with a **Start ride** button stays on the phone whenever no ride is running. It uses the same notification id as the ride notification, so starting a ride replaces it in place, and it comes back when the ride ends.
+
+**Tested on the phone (Galaxy S25 Ultra, Android 17 / API 37, app in the background, not opened):**
+- Tapping **Start ride** in the notification started the ride service as a foreground service with the location and connected-device types. No error in the log, a ride folder was created, and the service registered for 1 Hz high-accuracy GPS.
+- Tapping **Stop** in the ride notification ended it, and the Ready notification came back.
+- This answers the open question from section 3: the platform lets a notification button start a location foreground service from the background on this phone.
+
+**Still to confirm:**
+- That the **watch** (a Galaxy Watch6 Classic, with Samsung's Galaxy Wearable companion) mirrors the notification and shows the Start and Stop buttons.
+- That a ride started this way receives real GPS fixes outdoors. The test was indoors, so it proved the service starts and registers for location, not that fixes arrive.
+- The behaviour on other phones: Android's rules for starting a foreground service from a notification are the same across versions, but manufacturers differ.
