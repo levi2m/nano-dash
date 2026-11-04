@@ -1,6 +1,7 @@
 package dev.nanodash.logger.ui
 
 import android.Manifest
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -195,6 +197,12 @@ fun LoggerScreen() {
                     RideCard(
                         ride,
                         emphasise = ride === list.first(),
+                        onOpenRoute = {
+                            scope.launch {
+                                val gpx = java.io.File(RideFiles.root(context), "route.gpx")
+                                if (withContext(Dispatchers.IO) { RideFolder.writeGpx(ride.dir, gpx) }) openRoute(context, gpx)
+                            }
+                        },
                         onShareFit = { share(context, ride.fits) },
                         onShareAll = { share(context, ride.files) },
                         onRebuild = { scope.launch { withContext(Dispatchers.IO) { RideFolder.rebuildFit(ride.dir) }; reload() } },
@@ -456,7 +464,7 @@ private fun EmptyRides() {
 }
 
 @Composable
-private fun RideCard(ride: RideSummary, emphasise: Boolean, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit) {
+private fun RideCard(ride: RideSummary, emphasise: Boolean, onOpenRoute: () -> Unit, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit) {
     val c = nanoColors
     val locale = LocalConfiguration.current.locales[0]
     // The quiet Delete button is 48 dp tall with its label centred, so the card needs less bottom padding than the others.
@@ -473,8 +481,10 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, onShareFit: () -> Un
             RouteLine(
                 ride.route,
                 Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(Radius.small)).background(c.raised)
+                    .clickable(onClickLabel = "Open the route in a maps app", role = Role.Button, onClick = onOpenRoute)
                     .semantics { contentDescription = "Route of the ride, drawn from ${ride.fixes} GPS fixes" },
             )
+            Text("Tap the route to open it in a maps app", style = NanoText.label, color = c.textMuted)
         }
         Column {
             Fact("GPS fixes", ride.fixes.toString())
@@ -525,6 +535,14 @@ private fun clock(totalSeconds: Long): String = when {
     totalSeconds >= 3600 -> "%d h %02d min".format(totalSeconds / 3600, (totalSeconds / 60) % 60)
     totalSeconds >= 60 -> "%d min %02d s".format(totalSeconds / 60, totalSeconds % 60)
     else -> "$totalSeconds s"
+}
+
+/** Hands the GPX to whichever installed app opens routes (OsmAnd, Organic Maps, ...), so the app itself needs no network. */
+private fun openRoute(context: Context, gpx: java.io.File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", gpx)
+    val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/gpx+xml")
+        .apply { clipData = ClipData.newRawUri("", uri) }.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(Intent.createChooser(view, "Open route in").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 private fun share(context: Context, files: List<java.io.File>) {

@@ -94,6 +94,16 @@ class RideFolderTest {
     }
 
     @Test
+    fun writeGpxNeedsFixesAndNamesTheTrackAfterTheRide() {
+        val out = File(root, "route.gpx")
+        assertFalse(RideFolder.writeGpx(ride("ride-5", 0, finished = true), out))
+        assertFalse(out.exists())
+        assertTrue(RideFolder.writeGpx(ride("ride-6", 3, finished = true), out))
+        assertEquals(3, Regex("<trkpt ").findAll(out.readText()).count())
+        assertTrue(out.readText().contains("<name>ride-6</name>"))
+    }
+
+    @Test
     fun zipAllPacksEveryRidesFilesUnderItsFolderName() {
         ride("ride-a", 5, finished = true, events = "{}")
         ride("ride-b", 5, finished = true)

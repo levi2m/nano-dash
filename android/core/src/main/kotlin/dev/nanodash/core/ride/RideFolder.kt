@@ -109,6 +109,14 @@ object RideFolder {
 
     fun delete(dir: File): Boolean = dir.deleteRecursively()
 
+    /** Writes the ride's track to [out] as GPX so a map app can show it. False when the ride has no GPS fixes. */
+    fun writeGpx(dir: File, out: File): Boolean {
+        val gnss = File(dir, "gnss.csv").takeIf { it.exists() } ?: return false
+        val fixes = RideRecovery.parseGnssCsv(gnss.readText()).takeIf { it.isNotEmpty() } ?: return false
+        out.writeText(Gpx.write(dir.name, fixes))
+        return true
+    }
+
     /** Packs every ride's files into one zip (`<ride folder>/<file>`) so uninstalling the app does not lose the rides. Returns the ride count. */
     fun zipAll(root: File, out: File): Int {
         val dirs = root.listFiles { f -> f.isDirectory && f.name.startsWith("ride-") }?.sortedBy { it.name } ?: emptyList()

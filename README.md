@@ -16,6 +16,7 @@ Ride logger for the DJI Osmo Nano on a motorcycle. It starts and stops the camer
 - Logs the ride with the screen off: GPS at 1 Hz, motion sensors at about 45 Hz, pressure.
 - Writes the `.fit` with the same record fields as Mimo's own export, on real timestamps, plus developer fields (lean angle, lateral and longitudinal acceleration, camera recording flag) estimated from the GPS track.
 - Controls several Nanos at once ("Choose cameras"). With cameras whose clocks differ, each gets its own `ride-<camera>.fit`.
+- Opens a ride's route in a maps app that reads GPX (OsmAnd, Organic Maps and others): tap the route preview on the ride. The app draws no map itself, so it needs no network.
 - Keeps everything on the phone. The app has no internet permission, and rides leave only when you tap Share.
 
 Only Mimo draws the overlays, so Mimo is needed once, at the end, to import the `.fit` with the clip.

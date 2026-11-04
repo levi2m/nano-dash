@@ -24,6 +24,7 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 
 - **Other DJI cameras** (Osmo Action line). They are reported to use DJI's R SDK framing, not the Nano's. That document and demo fall under DJI's developer licence, which this project avoids so it can be Apache-2.0 and go to F-Droid. Each model would also need its own timing measured. The scan lists only the Nano, so the app never sends Nano commands to a camera that does not speak them.
 - **Replacing Mimo's other features** (camera settings, live preview, fetching clips over Wi-Fi). Possible to study by capturing Mimo's own traffic on a phone you own, but not planned. Mimo stays the place for overlays.
+- **A map inside the app.** Map tiles need the internet permission and tell a tile server where you ride, which this app promises not to do. A ride's route opens in a maps app as GPX instead.
 - **Phone microphone to hear the start beep.** It sees only what the app already tracks over Bluetooth and would add a microphone permission to an app that promises not to leak anything.
 
 ## Release checklist
