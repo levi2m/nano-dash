@@ -17,3 +17,4 @@ rootProject.name = "nano-dash"
 
 include(":core")
 include(":app")
+include(":wear")

@@ -33,6 +33,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -68,6 +69,13 @@ import dev.nanodash.logger.CameraController
 import dev.nanodash.logger.CameraUi
 import dev.nanodash.logger.LoggerService
 import dev.nanodash.logger.Note
+import dev.nanodash.logger.WatchLink
+import dev.nanodash.core.watch.CameraState
+import dev.nanodash.core.watch.GpsState
+import dev.nanodash.core.watch.RideState
+import dev.nanodash.core.watch.WatchCommand
+import dev.nanodash.core.watch.WatchProtocol
+import dev.nanodash.core.watch.WatchState
 import dev.nanodash.logger.RideFiles
 import dev.nanodash.logger.RideStore
 import dev.nanodash.core.ride.RideFolder
@@ -146,6 +154,15 @@ fun LoggerScreen() {
         }.toTypedArray()
     }
     var quickStart by remember { mutableStateOf(LoggerService.quickStartEnabled(context)) }
+    // Spike: while quick start is on and the screen is open, answer the watch app's status question over Bluetooth.
+    DisposableEffect(quickStart) {
+        val link = WatchLink(context, { null }) { command ->
+            if (command == WatchCommand.Status) WatchProtocol.encode(WatchState(RideState.Idle, 0, GpsState.Off, CameraState.None)) else WatchProtocol.err("spike")
+        }
+        val allowed = Build.VERSION.SDK_INT < 31 || ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        if (quickStart && allowed) link.start()
+        onDispose { link.stop() }
+    }
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) { quickStart = true; LoggerService.setQuickStart(context, true) }
     }
