@@ -142,13 +142,13 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification("Starting"), types)
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            RideStore.update { it.copy(message = "Location permission is missing.") }
+            RideStore.update { it.copy(message = Note("Location permission is missing.", needsSettings = true)) }
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
         }
         if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-            RideStore.update { it.copy(message = "Location is switched off in the phone's settings.") }
+            RideStore.update { it.copy(message = Note("Location is switched off in the phone's settings.")) }
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
@@ -199,10 +199,10 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun startCamera(s: Session) {
         s.cameraJob = CameraController.scope.launch {
             if (CameraController.readyIds().isEmpty()) {
-                RideStore.update { it.copy(cameraNote = "Camera not connected, so this ride has no video.") }
+                RideStore.update { it.copy(cameraNote = Note("Camera not connected, so this ride has no video.")) }
                 s.event(JSONObject().put("event", "camera_not_ready"))
             } else {
-                RideStore.update { it.copy(cameraNote = "Starting the camera") }
+                RideStore.update { it.copy(cameraNote = Note("Starting the camera", problem = false)) }
                 withContext(NonCancellable) { recordStarts(s, CameraController.startRecording()) }
             }
             while (isActive) {
@@ -228,7 +228,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                 else -> Unit
             }
         }
-        RideStore.update { it.copy(cameraNote = CameraNotes.startNote(CameraController.ui.value.rows.size.coerceAtLeast(s.cameras.size), s.cameras)) }
+        val connected = CameraController.ui.value.rows.size.coerceAtLeast(s.cameras.size)
+        RideStore.update { it.copy(cameraNote = Note(CameraNotes.startNote(connected, s.cameras), problem = !CameraNotes.startOk(connected, s.cameras))) }
     }
 
     private fun stampJson(s: Stamp) = JSONObject().put("utc_ms", s.utcMillis).put("elapsed_ns", s.monoNanos)
@@ -249,14 +250,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         thread = null
         // Until the thread below is done, a new ride must not start: its end would switch this service off under the new ride.
         saving = true
-        RideStore.update { it.copy(recording = false, saving = true, message = "Saving the ride") }
+        RideStore.update { it.copy(recording = false, saving = true, message = Note("Saving the ride", problem = false)) }
         notify("Saving the ride")
 
         Thread {
             try {
                 finishRide(s)
             } catch (e: Throwable) {
-                RideStore.update { it.copy(message = "Could not finish the ride: ${e.message}. The GPS log was kept; use Rebuild .fit.") }
+                RideStore.update { it.copy(message = Note("Could not finish the ride: ${e.message}. The GPS log was kept; use Rebuild .fit.")) }
             } finally {
                 saving = false
                 RideStore.update { it.copy(saving = false) }
@@ -296,27 +297,27 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                         .put("clip_span_estimate_utc_ms", span?.let { listOf(it.startUtcMillis, it.endUtcMillis) }?.let { org.json.JSONArray(it) } ?: JSONObject.NULL),
                 )
             }
-            RideStore.update { it.copy(cameraNote = CameraNotes.stopNote(started.size, unconfirmed)) }
+            RideStore.update { it.copy(cameraNote = CameraNotes.stopNote(started.size, unconfirmed)?.let { text -> Note(text) }) }
         }
 
         val endUtc = System.currentTimeMillis()
         var written = false
         var samples = 0
-        var message: String
+        var message: Note
         try {
             s.close()
             // Times are moved onto the camera's own clock (see CameraTiming) so Mimo finds the clip inside the file.
             val built = RideRecovery.buildFits(s.fixes, clips)
             if (built == null) {
-                message = "No GPS fixes were received, so no .fit was written. Motion data was saved."
+                message = Note("No GPS fixes were received, so no .fit was written. Motion data was saved.")
             } else {
                 built.forEach { File(s.dir, it.fileName).writeBytes(it.bytes) }
                 samples = built.first().samples
                 written = true
-                message = if (built.size == 1) "Saved ${samples} s of ride to ride.fit" else "Saved ${samples} s of ride, one .fit for each camera's clock"
+                message = Note(if (built.size == 1) "Saved ${samples} s of ride to ride.fit" else "Saved ${samples} s of ride, one .fit for each camera's clock", problem = false)
             }
         } catch (e: Exception) {
-            message = "Could not write the ride: ${e.message}"
+            message = Note("Could not write the ride: ${e.message}")
         }
         writeMeta(s, endUtc, written, samples, spans)
         RideStore.update { it.copy(message = message) }
@@ -330,7 +331,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         } catch (e: IOException) {
             if (!writeFailed) {
                 writeFailed = true
-                RideStore.update { it.copy(message = "Could not write to storage. Is the phone full?") }
+                RideStore.update { it.copy(message = Note("Could not write to storage. Is the phone full?")) }
             }
         }
     }

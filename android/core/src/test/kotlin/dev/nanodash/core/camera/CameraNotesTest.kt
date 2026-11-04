@@ -56,6 +56,15 @@ class CameraNotesTest {
     }
 
     @Test
+    fun startIsOkOnlyWhenEveryConnectedCameraReportedRecording() {
+        assertTrue(CameraNotes.startOk(1, mapOf("A" to ok)))
+        assertTrue(CameraNotes.startOk(2, mapOf("A" to ok, "B" to ok)))
+        assertFalse(CameraNotes.startOk(2, mapOf("A" to ok)))                                        // one was left out
+        assertFalse(CameraNotes.startOk(1, mapOf("A" to StartResult.Started(t, t, null))))           // accepted, never reported recording
+        assertFalse(CameraNotes.startOk(1, mapOf("A" to StartResult.NoReply)))
+    }
+
+    @Test
     fun startNoteNamesWhatWentWrongAndWhoWasLeftOut() {
         assertEquals("Camera refused to record (code D6). Is USB connected?", CameraNotes.startNote(1, mapOf("A" to StartResult.Rejected(0xD6, t))))
         assertEquals("1 of 3 cameras recording. Osmo Nano B is not ready. 1 camera was not ready and has no video.",

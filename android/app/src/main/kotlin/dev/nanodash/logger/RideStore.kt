@@ -15,9 +15,12 @@ data class RideUiState(
     val satellitesUsed: Int? = null,
     val satellitesVisible: Int? = null,
     val imuSamples: Long = 0,
-    val message: String? = null,
-    val cameraNote: String? = null,
+    val message: Note? = null,
+    val cameraNote: Note? = null,
 )
+
+/** One line under the Start button. [problem] colours it amber; [needsSettings] adds the shortcut to the app's settings. */
+data class Note(val text: String, val problem: Boolean = true, val needsSettings: Boolean = false)
 
 object RideStore {
     val state = MutableStateFlow(RideUiState())

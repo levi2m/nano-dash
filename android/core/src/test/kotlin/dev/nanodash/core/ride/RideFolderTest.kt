@@ -94,6 +94,20 @@ class RideFolderTest {
     }
 
     @Test
+    fun summarisesDistanceAndTopSpeedAndRebuildsAnOlderCacheFromTheLog() {
+        val dir = ride("ride-7", 4, finished = true)                       // fixes 0.01 degrees of latitude apart, 8 m/s each
+        val first = RideFolder.summarize(dir)
+        assertEquals(3336.0, assertNotNull(first.distanceM), 5.0)
+        assertEquals(8.0f, first.topSpeedMps)
+        File(dir, "route.txt").writeText("gap=1\n-20.2,-40.2\n-20.3,-40.2")   // a cache from before the distance was kept
+        assertEquals(3336.0, assertNotNull(RideFolder.summarize(dir).distanceM), 5.0)
+        assertTrue(File(dir, "route.txt").readText().startsWith("gap=1;dist="))
+        File(dir, "gnss.csv").delete()
+        File(dir, "route.txt").writeText("gap=1\n-20.2,-40.2")              // an old cache and no log: the figure stays unknown
+        assertNull(RideFolder.summarize(dir).distanceM)
+    }
+
+    @Test
     fun writeGpxNeedsFixesAndNamesTheTrackAfterTheRide() {
         val out = File(root, "route.gpx")
         assertFalse(RideFolder.writeGpx(ride("ride-5", 0, finished = true), out))

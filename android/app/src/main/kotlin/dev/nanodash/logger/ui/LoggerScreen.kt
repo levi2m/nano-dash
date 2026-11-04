@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -58,15 +59,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.location.LocationManagerCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.nanodash.logger.BuildConfigInfo
 import dev.nanodash.logger.CameraController
 import dev.nanodash.logger.CameraUi
 import dev.nanodash.logger.LoggerService
+import dev.nanodash.logger.Note
 import dev.nanodash.logger.RideFiles
 import dev.nanodash.logger.RideStore
 import dev.nanodash.core.ride.RideFolder
 import dev.nanodash.core.ride.RideSummary
+import dev.nanodash.core.ride.SpeedUnit
 import dev.nanodash.logger.RideUiState
 import dev.nanodash.logger.ui.components.ButtonKind
 import dev.nanodash.logger.ui.components.Health
@@ -101,6 +106,13 @@ fun LoggerScreen() {
     var confirmDelete by remember { mutableStateOf<RideSummary?>(null) }
     var showFolded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val unit = SpeedUnit.forCountry(LocalConfiguration.current.locales[0].country)
+    // Location can be switched off, or permission revoked, while the app is in the background, so look again every time it returns.
+    var gps by remember { mutableStateOf(GpsReadiness.Ready) }
+    LifecycleResumeEffect(Unit) {
+        gps = gpsReadiness(context)
+        onPauseOrDispose { }
+    }
 
     suspend fun reload() {
         rides = withContext(Dispatchers.IO) {
@@ -128,7 +140,7 @@ fun LoggerScreen() {
     }
     val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) LoggerService.start(context)
-        else RideStore.update { it.copy(message = "Precise location permission is needed to log a ride.") }
+        else RideStore.update { it.copy(message = Note("Precise location permission is needed to log a ride.", needsSettings = true)) }
     }
     val bluetoothPermissions = remember {
         if (Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT) else emptyArray()
@@ -136,7 +148,7 @@ fun LoggerScreen() {
     var afterBluetooth by remember { mutableStateOf<(() -> Unit)?>(null) }
     val bluetoothLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) afterBluetooth?.invoke()
-        else RideStore.update { it.copy(message = "Bluetooth permission is needed to connect the camera.") }
+        else RideStore.update { it.copy(message = Note("Bluetooth permission is needed to connect the camera.", needsSettings = true)) }
     }
 
     /** Runs [action] once the Bluetooth permissions are granted, asking for them first if needed. */
@@ -156,7 +168,7 @@ fun LoggerScreen() {
         verticalArrangement = Arrangement.spacedBy(Space.l),
     ) {
         item { Header() }
-        item { RidePanel(ui, cam, now) }
+        item { RidePanel(ui, cam, now, gps, unit) }
         item {
             ActionArea(
                 ui, cam,
@@ -198,6 +210,7 @@ fun LoggerScreen() {
                     RideCard(
                         ride,
                         emphasise = ride === list.first(),
+                        unit = unit,
                         onOpenRoute = {
                             scope.launch {
                                 val gpx = java.io.File(RideFiles.root(context), "route.gpx")
@@ -244,13 +257,11 @@ fun LoggerScreen() {
             Column(Modifier.fillMaxWidth().padding(top = Space.s), horizontalAlignment = Alignment.CenterHorizontally) {
                 // The build number is the last part of the release tag (v0.1.0-24), so it can be compared with the releases page.
                 Text("Nano Dash ${BuildConfigInfo.versionName(context)}, build ${BuildConfigInfo.build(context)}", style = NanoText.label, color = c.textMuted)
-                NanoButton(
-                    "Check for updates (opens your browser)",
+                // Label-sized, so a footer link does not weigh as much as the actions above it; the 48 dp minimum keeps it easy to hit.
+                TextButton(
                     { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
-                    Modifier.fillMaxWidth(),
-                    ButtonKind.Quiet,
-                    height = 48.dp,
-                )
+                    Modifier.heightIn(min = 48.dp),
+                ) { Text("Check for updates (opens your browser)", style = NanoText.label, color = c.textSecondary) }
             }
         }
     }
@@ -284,17 +295,18 @@ private fun Header() {
 }
 
 @Composable
-private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long) {
+private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadiness, unit: SpeedUnit) {
     val c = nanoColors
     Panel {
         if (ui.recording) {
             // The speed is the one bright figure. Without a fix there is nothing honest to show at that size, so say so quietly.
-            Box(Modifier.fillMaxWidth().height(96.dp), contentAlignment = Alignment.CenterStart) {
+            // The height is a minimum so the figure can grow with the phone's font size instead of being cut off.
+            Box(Modifier.fillMaxWidth().heightIn(min = 96.dp), contentAlignment = Alignment.CenterStart) {
                 val mps = ui.lastSpeedMps
                 if (mps != null) {
                     Row {
-                        Text("%.0f".format(mps * 3.6f), Modifier.alignByBaseline(), style = NanoText.hero, color = c.accentText)
-                        Text("km/h", Modifier.padding(start = Space.s).alignByBaseline(), style = NanoText.heading, color = c.textSecondary)
+                        Text("%.0f".format(mps * unit.speedPerMps), Modifier.alignByBaseline(), style = NanoText.hero, color = c.accentText)
+                        Text(unit.speedLabel, Modifier.padding(start = Space.s).alignByBaseline(), style = NanoText.heading, color = c.textSecondary)
                     }
                 } else {
                     Text("Waiting for GPS", style = NanoText.title, color = c.textSecondary)
@@ -309,7 +321,11 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long) {
         Hairline()
         Column {
         val (gpsValue, gpsHealth) = when {
-            !ui.recording -> "Starts with the ride" to Health.Off
+            !ui.recording -> when (gps) {
+                GpsReadiness.Ready -> "Location is on" to Health.Ok
+                GpsReadiness.LocationOff -> "Location is off, switch it on" to Health.Wait
+                GpsReadiness.NeedsPermission -> "Asked for when you start" to Health.Off
+            }
             ui.fixes == 0 -> (if (ui.satellitesVisible != null) "Searching, ${ui.satellitesVisible} in view" else "Searching for satellites") to Health.Wait
             else -> "${ui.lastAccuracyM?.let { "%.0f m".format(it) } ?: "no accuracy"}, ${ui.satellitesUsed ?: 0} satellites" to
                 (if ((ui.lastAccuracyM ?: 99f) <= 15f) Health.Ok else Health.Wait)
@@ -342,24 +358,24 @@ private fun ActionArea(ui: RideUiState, cam: CameraUi, onStart: () -> Unit, onSt
             NanoButton("Stop ride", onStop, Modifier.fillMaxWidth(), ButtonKind.Danger, height = 72.dp)
         } else {
             NanoButton("Start ride", onStart, Modifier.fillMaxWidth(), ButtonKind.Primary, height = 72.dp, enabled = !ui.saving)
-            // One message at a time under the button: the result of the last action wins over the standing hint.
-            if (!cam.ready && !cam.busy && ui.message == null && ui.cameraNote == null) {
-                Notice(
-                    if (cam.rows.isEmpty()) "The camera is not connected, so this ride will have no video." else "Not every camera is ready, so some will have no video.",
-                    health = Health.Wait,
-                )
-            }
         }
-        ui.cameraNote?.let { Notice(it, health = if (looksLikeProblem(it)) Health.Wait else Health.Off) }
-        ui.message?.let { Notice(it, health = if (looksLikeProblem(it)) Health.Wait else Health.Off) }
-        if (ui.message?.contains("permission", ignoreCase = true) == true) {
+        // The camera panel below says when no camera is ready, so only the result of the last action is repeated here.
+        ui.cameraNote?.let { Notice(it.text, health = if (it.problem) Health.Wait else Health.Off) }
+        ui.message?.let { Notice(it.text, health = if (it.problem) Health.Wait else Health.Off) }
+        if (ui.message?.needsSettings == true) {
             NanoButton("Open app settings", onOpenSettings, Modifier.fillMaxWidth(), ButtonKind.Secondary)
         }
     }
 }
 
-private fun looksLikeProblem(text: String): Boolean =
-    listOf("refused", "did not", "not connected", "missing", "needed", "could not", "switched off", "no gps").any { text.contains(it, ignoreCase = true) }
+/** Whether the phone can give a GPS fix right now, so the rider hears about a switched-off location before the ride, not after. */
+private enum class GpsReadiness { Ready, LocationOff, NeedsPermission }
+
+private fun gpsReadiness(context: Context): GpsReadiness = when {
+    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED -> GpsReadiness.NeedsPermission
+    !LocationManagerCompat.isLocationEnabled(context.getSystemService(Context.LOCATION_SERVICE) as LocationManager) -> GpsReadiness.LocationOff
+    else -> GpsReadiness.Ready
+}
 
 @Composable
 private fun CameraPanel(
@@ -372,6 +388,25 @@ private fun CameraPanel(
     onDisconnect: () -> Unit,
 ) {
     val c = nanoColors
+    // Once every camera is ready with its clock set there is nothing to decide, so the panel shrinks to one line and Rides move up.
+    var open by remember { mutableStateOf(false) }
+    val settled = !cam.choosing && !cam.error && !cam.busy && cam.ready && cam.rows.isNotEmpty() && cam.rows.all { it.clockSet }
+    LaunchedEffect(settled) { if (!settled) open = false }          // after any reconnect the panel folds up again once it is ready
+    if (settled && !open) {
+        Panel(bottomPadding = Space.l) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                    SectionLabel(if (cam.rows.size > 1) "Cameras" else "Camera")
+                    Text(
+                        if (cam.rows.size > 1) "All ready, clocks set to this phone" else "Ready, clock set to this phone",
+                        Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = NanoText.body, color = c.textSecondary,
+                    )
+                }
+                NanoButton("Manage", { open = true }, kind = ButtonKind.Quiet)
+            }
+        }
+        return
+    }
     Panel {
         SectionLabel(if (cam.rows.size > 1 || cam.choosing) "Cameras" else "Camera")
         if (cam.choosing) {
@@ -381,7 +416,7 @@ private fun CameraPanel(
         val approve = cam.text.startsWith("Approve")
         val shown = when {
             cam.ready -> if (cam.rows.size > 1) "All ready to start and stop with the ride" else "Ready to start and stop with the ride"
-            cam.text == "Camera not connected" -> "Turn the camera on, make sure wireless connection is enabled on it, close Mimo on the phone, then connect."
+            cam.text == "Camera not connected" -> "No camera is connected, so a ride now would have no video. Turn the camera on, make sure wireless connection is enabled on it, close Mimo on the phone, then connect."
             else -> caption(cam.text)
         }
         Text(
@@ -424,6 +459,7 @@ private fun CameraPanel(
             if (cam.rows.isNotEmpty()) NanoButton("Disconnect", onDisconnect, kind = ButtonKind.Quiet)
         }
         NanoButton("Choose cameras", onChoose, Modifier.fillMaxWidth(), ButtonKind.Quiet, enabled = !cam.busy)
+        if (settled) NanoButton("Done", { open = false }, Modifier.fillMaxWidth(), ButtonKind.Quiet)
     }
 }
 
@@ -478,7 +514,7 @@ private fun EmptyRides() {
 }
 
 @Composable
-private fun RideCard(ride: RideSummary, emphasise: Boolean, onOpenRoute: () -> Unit, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit) {
+private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onOpenRoute: () -> Unit, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit) {
     val c = nanoColors
     val locale = LocalConfiguration.current.locales[0]
     // The quiet Delete button is 48 dp tall with its label centred, so the card needs less bottom padding than the others.
@@ -502,6 +538,8 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, onOpenRoute: () -> U
         }
         Column {
             Fact("GPS fixes", ride.fixes.toString())
+            ride.distanceM?.takeIf { it > 0 }?.let { Fact("Distance", "%.1f %s".format(it / unit.metersPerDistanceUnit, unit.distanceLabel)) }
+            ride.topSpeedMps?.takeIf { it > 0 }?.let { Fact("Top speed", "%.0f %s".format(it * unit.speedPerMps, unit.speedLabel)) }
             // GPS is logged once a second, so a long wait means a tunnel or the phone pausing the app; 10 s keeps ordinary hiccups out.
             ride.longestGapSeconds?.takeIf { it >= 10 }?.let { Fact("Longest GPS gap", clock(it)) }
             ride.cameraClipSeconds.forEachIndexed { i, s ->
@@ -531,7 +569,7 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, onOpenRoute: () -> U
             }
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-            NanoButton("Delete ride", onDelete, kind = ButtonKind.Quiet, height = 48.dp)
+            NanoButton("Delete ride", onDelete, kind = ButtonKind.QuietDanger, height = 48.dp)
         }
     }
 }

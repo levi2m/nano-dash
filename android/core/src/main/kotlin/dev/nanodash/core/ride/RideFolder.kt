@@ -12,6 +12,9 @@ class RideSummary(
     val fixes: Int,
     /** The longest wait between two GPS fixes; a long one on a screen-off ride means the phone paused the app. Null when unknown. */
     val longestGapSeconds: Long?,
+    /** Straight-line distance between the fixes, in metres, and the highest speed the GPS reported. Null when unknown. */
+    val distanceM: Double?,
+    val topSpeedMps: Float?,
     val hasFit: Boolean,
     /** Length of each camera's clip, in the order the cameras were stopped. */
     val cameraClipSeconds: List<Double>,
@@ -56,6 +59,8 @@ object RideFolder {
             durationSeconds = if (start > 0 && end != null && end > start) (end - start) / 1000 else null,
             fixes = track.fixes,
             longestGapSeconds = track.longestGapSeconds,
+            distanceM = track.distanceM,
+            topSpeedMps = track.topSpeedMps,
             hasFit = fits.isNotEmpty(),
             cameraClipSeconds = clips,
             sizeKb = files.sumOf { it.length() } / 1024,
@@ -65,33 +70,41 @@ object RideFolder {
     }
 
     /**
-     * The fix count and the thinned route. Reading a whole GPS log for every ride on every refresh is slow with many rides, so a
-     * finished ride keeps its route (and the longest gap, on a first `gap=<seconds>` line) in `route.txt` and its count in `meta.json`;
-     * a ride that was cut off is always read from its log. A cache from before the gap existed has no such line, so the gap is unknown.
+     * What the list shows about the GPS track. Reading a whole GPS log for every ride on every refresh is slow with many rides, so a
+     * finished ride keeps its route and figures in `route.txt` (a first line `gap=<s>;dist=<m>;top=<m/s>`, then one `lat,lon` per
+     * line) and its fix count in `meta.json`; a ride that was cut off is always read from its log. A cache written before the
+     * distance was kept is read again from the log while that still exists, otherwise its missing figures stay unknown.
      */
     private fun trackOf(dir: File, finished: Boolean, metaFixes: Int?): Track {
         val cache = File(dir, "route.txt")
+        val gnss = File(dir, "gnss.csv").takeIf { it.exists() }
         if (finished && metaFixes != null && cache.exists()) {
             val lines = cache.readLines()
-            val gap = lines.firstOrNull()?.takeIf { it.startsWith("gap=") }?.substring(4)?.toLongOrNull()
+            val header = lines.firstOrNull()?.takeIf { it.startsWith("gap=") }?.split(';')
+                ?.mapNotNull { part -> part.split('=').takeIf { it.size == 2 }?.let { it[0] to it[1] } }?.toMap().orEmpty()
             val route = lines.mapNotNull { line ->
                 val p = line.split(',')
                 val lat = p.getOrNull(0)?.toDoubleOrNull()
                 val lon = p.getOrNull(1)?.toDoubleOrNull()
                 if (p.size == 2 && lat != null && lon != null) lat to lon else null
             }
-            return Track(metaFixes, gap, route)
+            val dist = header["dist"]?.toDoubleOrNull()
+            if (dist != null || gnss == null) return Track(metaFixes, header["gap"]?.toLongOrNull(), dist, header["top"]?.toFloatOrNull(), route)
         }
-        val gnss = File(dir, "gnss.csv").takeIf { it.exists() } ?: return Track(0, null, emptyList())
+        gnss ?: return Track(0, null, null, null, emptyList())
         val fixes = RideRecovery.parseGnssCsv(gnss.readText())
         val step = maxOf(1, fixes.size / MAX_ROUTE_POINTS)
         val route = fixes.filterIndexed { i, _ -> i % step == 0 || i == fixes.lastIndex }.map { it.latitudeDeg to it.longitudeDeg }
         val gap = longestGapSeconds(fixes)
-        if (finished) runCatching { cache.writeText("gap=$gap\n" + route.joinToString("\n") { "${it.first},${it.second}" }) }
-        return Track(fixes.size, gap, route)
+        val dist = fixes.zipWithNext { a, b -> GeoMath.distanceM(a.latitudeDeg, a.longitudeDeg, b.latitudeDeg, b.longitudeDeg) }.sum()
+        val top = fixes.mapNotNull { it.speedMps }.maxOrNull()
+        if (finished) runCatching {
+            cache.writeText("gap=$gap;dist=$dist" + (top?.let { ";top=$it" } ?: "") + "\n" + route.joinToString("\n") { "${it.first},${it.second}" })
+        }
+        return Track(fixes.size, gap, dist, top, route)
     }
 
-    private class Track(val fixes: Int, val longestGapSeconds: Long?, val route: List<Pair<Double, Double>>)
+    private class Track(val fixes: Int, val longestGapSeconds: Long?, val distanceM: Double?, val topSpeedMps: Float?, val route: List<Pair<Double, Double>>)
 
     /** The longest wait between two neighbouring fixes, in seconds; 0 for fewer than two fixes. */
     fun longestGapSeconds(fixes: List<GnssFix>): Long =

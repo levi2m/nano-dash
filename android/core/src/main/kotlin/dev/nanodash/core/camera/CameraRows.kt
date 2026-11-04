@@ -60,6 +60,10 @@ object CameraNotes {
         }
     }
 
+    /** True when every connected camera started and reported recording, which is when [startNote] has nothing to warn about. */
+    fun startOk(connected: Int, results: Map<String, StartResult>): Boolean =
+        results.size >= connected && results.values.all { it is StartResult.Started && it.recordingFlagAt != null }
+
     /** Null when every camera that was started confirmed the stop. */
     fun stopNote(started: Int, unconfirmed: List<String>): String? = when {
         unconfirmed.isEmpty() -> null

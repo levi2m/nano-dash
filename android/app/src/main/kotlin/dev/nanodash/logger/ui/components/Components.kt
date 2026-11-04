@@ -116,7 +116,8 @@ fun Notice(text: String, modifier: Modifier = Modifier, health: Health = Health.
     Text(caption(text), modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }, style = NanoText.body, color = color)
 }
 
-enum class ButtonKind { Primary, Danger, Secondary, Quiet }
+/** QuietDanger is a text button in the destructive colour, for Delete where a filled red button would shout. */
+enum class ButtonKind { Primary, Danger, Secondary, Quiet, QuietDanger }
 
 /** Touch targets are at least 48 dp, the main action 72 dp so it can be pressed with a glove. */
 @Composable
@@ -146,6 +147,11 @@ fun NanoButton(
             onClick, sized, enabled, shape = shape,
             border = BorderStroke(1.dp, if (enabled) c.textMuted else c.hairline),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = c.text, disabledContentColor = c.textMuted),
+        ) { Text(text, style = NanoText.button) }
+
+        ButtonKind.QuietDanger -> TextButton(
+            onClick, sized, enabled, shape = shape,
+            colors = ButtonDefaults.textButtonColors(contentColor = c.bad, disabledContentColor = c.textMuted),
         ) { Text(text, style = NanoText.button) }
 
         ButtonKind.Quiet -> TextButton(
