@@ -4,7 +4,7 @@ F-Droid builds the app from source and signs it with its own key, so an F-Droid 
 
 ## What is ready in this repository
 
-- **Listing:** `fastlane/metadata/android/en-US/` holds the title, short and full description, a screenshot and a changelog (named by version code). F-Droid reads them from here.
+- **Listing:** `fastlane/metadata/android/en-US/` holds the title, short and full description and a changelog (named by version code); screenshots go in `images/phoneScreenshots/` once a fresh one is taken. F-Droid reads them from here.
 - **Recipe draft:** `fdroid/io.github.levi2m.nanodash.yml`, to be copied into the F-Droid data repository. It has not been run through F-Droid's own build yet.
 - **Source checks that were run** (see the results at the end of this file): a fresh public clone builds the release APK with no signing key, the two builds can be compared, and the dependency list has no Google Play services, analytics or crash reporters.
 - **Licences:** the app is Apache-2.0. Its dependencies are AndroidX, Kotlin and Compose, all free software.
