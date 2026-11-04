@@ -19,7 +19,7 @@ Reused from the phone app so the two feel like one product, with one deliberate 
 | Token | Value | Used for | Contrast on black (measured) |
 |---|---|---|---|
 | ground | `#000000` | background | n/a |
-| surface | `#232325` | the hold ring track, chips | n/a |
+| surface | `#232325` | the Hold to stop button before it fills, other secondary buttons | n/a |
 | text | `#EDEDED` | the hero and main words | 17.94:1 |
 | text secondary | `#A1A1A6` | status words | 8.16:1 |
 | text muted | `#85858B` | hints | 5.73:1 |
@@ -32,7 +32,7 @@ Reused from the phone app so the two feel like one product, with one deliberate 
 - **Type:** the Wear Material 3 scale. The hero is the largest size on the screen, with tabular figures so the timer does not jitter. Status words use the label size. Sentence case everywhere.
 - **Spacing:** a 4 dp grid. The hero sits in the vertical middle; the status line above it; the button at the bottom edge.
 - **Shape:** the edge button follows the screen's curve. No cards, no outlines, no shadows, no gradients.
-- **Motion:** only the hold ring filling, and the standard spinner. Nothing animates in ambient mode.
+- **Motion:** only the Stop button filling while held, and the spinner.
 
 ## 3. States
 
@@ -43,7 +43,7 @@ Reused from the phone app so the two feel like one product, with one deliberate 
 | 3 | Ready, no camera | "Ready" | dot grey: "No camera" | Start ride |
 | 4 | Starting (request sent) | spinner | none | none (disabled) |
 | 5 | Recording | the running time, in ember | GPS dot + word, camera dot + word | Hold to stop |
-| 6 | Stopping (finger down) | the running time, dimmed | none | the ring fills while held |
+| 6 | Stopping (finger down) | the running time | GPS and camera dots | the button fills red from the left while held |
 | 7 | Saving | spinner | "Saving ride" | none |
 | 8 | Saved (shown for 2 seconds) | "Saved" | none | none |
 | 9 | Error | the reason, short | what to do | Try again |
@@ -67,8 +67,8 @@ Starting with no camera is allowed (state 3), exactly as on the phone: the ride 
 ## 4. Interactions
 
 - **Start:** one tap. State 4 until the phone confirms. Haptic: two short pulses on success.
-- **Stop:** press and hold the button for 1.2 seconds. A ring fills around it as you hold, with a light tick at the start. Letting go early cancels, with no message. When the ring completes: one long pulse, then state 7.
-- **Hands off:** the app does not keep the screen on. When the wrist drops, Wear OS takes it to ambient mode, which shows only the running time, dim, no colour.
+- **Stop:** press and hold the button for 1.2 seconds. The button fills red from the left as you hold, with a light tick at the start. Letting go early cancels, with no message. When it is full: one long pulse, then state 7. If the phone does not confirm (link lost), the button re-arms after 3 seconds so you can hold again. A command that waited more than 5 seconds for the link is dropped, never sent late.
+- **Hands off:** the app does not keep the screen on and has no ambient screen of its own. When the wrist drops, Wear OS leaves the app and the link pauses; the ride on the phone is unaffected, and the screen is current again when you raise your wrist.
 - **Reconnect:** if the phone link drops during a ride, the screen shows state 1, and the ride on the phone keeps going. When the link returns, the screen goes straight back to state 5. Losing the watch never affects the ride.
 - **Back and swipe:** the system swipe-to-dismiss works at every state and never changes a ride.
 
@@ -104,3 +104,11 @@ Plain words, sentence case, no em dashes, short enough for a 1.47 inch screen. E
 ## 7. Not in the first version
 
 Speed, a map, heart rate, a complication, and the tile (milestone 4: the same hero and button, refreshed over the same link). Each is a separate decision, because the half-second glance is the product.
+
+## 8. What changed while building (build 40)
+
+- **Hold to stop fills the button from the left,** in the stop colour, instead of drawing a ring around it. It is easier to see through a glove and simpler to draw. Letting go early still cancels with no message.
+- **Wear OS 4 (API 31) is the minimum.** The vibration and Bluetooth permission APIs the app uses start there, and supporting Wear OS 3 as well was not worth the extra code.
+- **No ambient screen of its own.** Wear OS leaves the app as it is and the watch's own timeout takes over.
+- **Spinner and pill buttons are drawn by the app** (the pill is 64 dp tall and 78 percent of the width), instead of using the library's edge button, so their size and feel are exactly as specified.
+- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: start, the running screen, hold to stop, and the saved ride all work.

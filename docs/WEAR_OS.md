@@ -1,6 +1,6 @@
 # Wear OS remote: design
 
-Status: Stage 1 and 1b are built (build 36, off by default). The watch side is still to be confirmed on a real watch. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
+Status: built and working (build 40): the armed phone service, the Bluetooth link, and the watch app (see section 13). The notification-only route from section 3 stays as a fallback. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
 
 ## 1. What is needed, and what is not
 
@@ -155,3 +155,13 @@ Two things the spike taught:
 - The on-watch screen is tiny, so every message must be short.
 
 Next: milestone 2, the armed phone service and the real handler.
+
+## 13. Built and tested (build 40)
+
+- **Phone:** the service has an armed mode (a "Nano Dash is ready" notification, no GPS, a Bluetooth listener) switched by "Quick start from the watch". It serves only the paired device the rider chose, answers `STATUS`, and turns `START` and `STOP` into a real ride on the main thread. A start is refused with a reason (`gps-off`, `no-permission`, `busy`) when it cannot happen. The phone app asks for location, Bluetooth and notification permission the first time.
+- **Watch:** `:wear` is a Wear OS 4 app that reaches the phone over the paired link, polls its state every 1.5 seconds and reconnects by itself. Its screens follow [WEAR_UI.md](WEAR_UI.md).
+- **CI** builds both APKs and attaches them to every release: `nano-dash-<tag>.apk` for the phone and `nano-dash-wear-<tag>.apk` for the watch.
+- **Installing the watch app:** enable developer mode on the watch, turn on Debug over Wi-Fi, then `adb connect <watch ip:port>` and `adb install nano-dash-wear-<tag>.apk`. F-Droid cannot install onto a watch.
+- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: everything worked.
+
+**Still open:** the tile, a simpler way to install the watch app, the behaviour on other watches, and whether a ride started from the watch receives GPS fixes outdoors (the service type is chosen to allow it, but only a ride outdoors proves it).
