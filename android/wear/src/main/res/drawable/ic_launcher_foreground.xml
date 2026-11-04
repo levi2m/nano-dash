@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The product mark: a ride drawn as the line it took, hollow where it started, solid where it ended. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M32,72 L46,56 L58,64 L78,38"
+        android:strokeColor="#FF7A1A"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M26,72 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0"
+        android:strokeColor="#FF7A1A"
+        android:strokeWidth="3" />
+    <path
+        android:fillColor="#FF7A1A"
+        android:pathData="M71,38 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+</vector>

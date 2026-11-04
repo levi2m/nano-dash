@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.levi2m.nanodash"   // the same id as the phone app: they are installed on different devices
-        minSdk = 30
+        minSdk = 31   // the Bluetooth connect permission and the vibrator manager arrive in API 31 (Wear OS 4); older watches are left out
         targetSdk = 37
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1   // CI passes its run number, as for the phone app
         versionName = "0.1.0"
@@ -58,5 +58,6 @@ dependencies {
     implementation(libs.wear.compose.foundation)
     implementation(libs.activity.compose)
     implementation(libs.core.ktx)
+    implementation(libs.lifecycle.runtime.compose)
     implementation(libs.coroutines.android)
 }

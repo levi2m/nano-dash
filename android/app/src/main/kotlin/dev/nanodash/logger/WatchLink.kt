@@ -21,7 +21,7 @@ fun interface WatchHandler {
 /**
  * Listens for the watch on a secure Bluetooth serial channel (Android encrypts and authenticates it with the watch's
  * existing pairing) and answers its commands one line at a time. One watch is served at a time.
- * [allowedAddress] is the paired device the user chose as their watch; null accepts any paired device (spike only).
+ * [allowedAddress] is the paired device the rider chose as their watch; while none is chosen nobody is served.
  */
 class WatchLink(
     private val context: Context,
@@ -72,8 +72,8 @@ class WatchLink(
 
     @SuppressLint("MissingPermission")
     private fun serve(socket: BluetoothSocket) {
-        val allowed = allowedAddress()
-        if (allowed != null && socket.remoteDevice.address != allowed) return      // not the user's watch: closed at once
+        val allowed = allowedAddress() ?: return                                  // no watch chosen yet: serve nobody
+        if (socket.remoteDevice.address != allowed) return                         // not the rider's watch: closed at once
         val input = BoundedLineReader(BufferedInputStream(socket.inputStream))
         val out = socket.outputStream
         fun send(line: String) { out.write((line + "\n").toByteArray()); out.flush() }

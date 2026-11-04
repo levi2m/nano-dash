@@ -1,6 +1,8 @@
 package dev.nanodash.logger.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothManager
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -33,7 +35,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -69,13 +70,6 @@ import dev.nanodash.logger.CameraController
 import dev.nanodash.logger.CameraUi
 import dev.nanodash.logger.LoggerService
 import dev.nanodash.logger.Note
-import dev.nanodash.logger.WatchLink
-import dev.nanodash.core.watch.CameraState
-import dev.nanodash.core.watch.GpsState
-import dev.nanodash.core.watch.RideState
-import dev.nanodash.core.watch.WatchCommand
-import dev.nanodash.core.watch.WatchProtocol
-import dev.nanodash.core.watch.WatchState
 import dev.nanodash.logger.RideFiles
 import dev.nanodash.logger.RideStore
 import dev.nanodash.core.ride.RideFolder
@@ -137,8 +131,8 @@ fun LoggerScreen() {
         }
     }
     LaunchedEffect(ui.recording, ui.message) { reload() }
-    // With quick start on, the Start notification should be there whenever the app is open and no ride is running.
-    LaunchedEffect(ui.recording, ui.saving) { if (!ui.recording && !ui.saving) LoggerService.showReady(context) }
+    // With quick start on, the service is armed whenever the app is on screen: Android only lets it start from the foreground.
+    LaunchedEffect(Unit) { LoggerService.arm(context) }
     LaunchedEffect(ui.recording) {
         while (ui.recording) {
             now = System.currentTimeMillis()
@@ -154,26 +148,31 @@ fun LoggerScreen() {
         }.toTypedArray()
     }
     var quickStart by remember { mutableStateOf(LoggerService.quickStartEnabled(context)) }
-    // Spike: while quick start is on and the screen is open, answer the watch app's status question over Bluetooth.
-    DisposableEffect(quickStart) {
-        val link = WatchLink(context, { null }) { command ->
-            if (command == WatchCommand.Status) WatchProtocol.encode(WatchState(RideState.Idle, 0, GpsState.Off, CameraState.None)) else WatchProtocol.err("spike")
-        }
-        val allowed = Build.VERSION.SDK_INT < 31 || ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-        if (quickStart && allowed) link.start()
-        onDispose { link.stop() }
+    var watchName by remember { mutableStateOf(LoggerService.watchName(context)) }
+    var chooseWatch by remember { mutableStateOf(false) }
+    // Quick start needs location (the service type), Bluetooth (the watch link) and notifications (the Start button).
+    val quickStartPermissions = remember {
+        buildList {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (Build.VERSION.SDK_INT >= 31) add(Manifest.permission.BLUETOOTH_CONNECT)
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        }.toTypedArray()
     }
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) { quickStart = true; LoggerService.setQuickStart(context, true) }
+    val quickStartLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+            quickStart = true
+            LoggerService.setQuickStart(context, true)
+            if (watchName == null) chooseWatch = true
+        }
     }
     fun toggleQuickStart() {
         val on = !quickStart
-        if (on && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)   // the notification cannot show without it
-            return
-        }
+        val missing = quickStartPermissions.any { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+        if (on && missing) { quickStartLauncher.launch(quickStartPermissions); return }
         quickStart = on
         LoggerService.setQuickStart(context, on)
+        if (on && watchName == null) chooseWatch = true
     }
 
     val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
@@ -302,6 +301,11 @@ fun LoggerScreen() {
                 TextButton({ toggleQuickStart() }, Modifier.heightIn(min = 48.dp)) {
                     Text("Quick start from the watch: ${if (quickStart) "on" else "off"} (tap to switch)", style = NanoText.label, color = c.textSecondary)
                 }
+                if (quickStart) {
+                    TextButton({ chooseWatch = true }, Modifier.heightIn(min = 48.dp)) {
+                        Text("Watch: ${watchName ?: "none chosen"} (tap to choose)", style = NanoText.label, color = c.textSecondary)
+                    }
+                }
                 // Label-sized, so a footer link does not weigh as much as the actions above it; the 48 dp minimum keeps it easy to hit.
                 TextButton(
                     { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
@@ -309,6 +313,32 @@ fun LoggerScreen() {
                 ) { Text("Check for updates (opens your browser)", style = NanoText.label, color = c.textSecondary) }
             }
         }
+    }
+
+    if (chooseWatch) {
+        val devices = remember { pairedDevices(context) }
+        AlertDialog(
+            onDismissRequest = { chooseWatch = false },
+            containerColor = c.card,
+            title = { Text("Which is your watch?", style = NanoText.heading, color = c.text) },
+            text = {
+                if (devices.isEmpty()) {
+                    Text("No paired devices were found. Pair your watch with this phone first.", style = NanoText.body, color = c.textSecondary)
+                } else {
+                    Column {
+                        Text("Only this device can start and stop rides.", style = NanoText.body, color = c.textSecondary)
+                        devices.forEach { (name, address) ->
+                            TextButton(
+                                onClick = { LoggerService.setWatch(context, address, name); watchName = name; chooseWatch = false },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            ) { Text(name, style = NanoText.button, color = c.text) }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { chooseWatch = false }) { Text("Cancel", style = NanoText.button, color = c.text) } },
+        )
     }
 
     confirmDelete?.let { ride ->
@@ -652,3 +682,10 @@ private fun share(context: Context, files: List<java.io.File>) {
     }
     context.startActivity(Intent.createChooser(intent, "Share ride").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
+
+/** The devices already paired with this phone, by name, for choosing which one is the watch. */
+@SuppressLint("MissingPermission")
+private fun pairedDevices(context: Context): List<Pair<String, String>> = runCatching {
+    context.getSystemService(BluetoothManager::class.java).adapter.bondedDevices
+        .map { (it.name ?: it.address) to it.address }.sortedBy { it.first.lowercase() }
+}.getOrDefault(emptyList())

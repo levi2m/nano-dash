@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
@@ -35,6 +36,12 @@ import dev.nanodash.core.camera.StartResult
 import dev.nanodash.core.camera.StopResult
 import dev.nanodash.core.camera.cameraLabel
 import dev.nanodash.core.fit.CameraSpan
+import dev.nanodash.core.watch.CameraState
+import dev.nanodash.core.watch.GpsState
+import dev.nanodash.core.watch.RideState
+import dev.nanodash.core.watch.WatchCommand
+import dev.nanodash.core.watch.WatchProtocol
+import dev.nanodash.core.watch.WatchState
 import dev.nanodash.core.ride.ClockSkew
 import dev.nanodash.core.ride.GnssFix
 import dev.nanodash.core.ride.RideFolder
@@ -74,8 +81,12 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private lateinit var locationManager: LocationManager
     private lateinit var sensorManager: SensorManager
     private var thread: HandlerThread? = null
-    private var session: Session? = null
+    @Volatile private var session: Session? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    /** Quick start: the service stays up between rides, showing the Start notification and listening for the watch. */
+    @Volatile private var armed = false
+    private var watchLink: WatchLink? = null
+    private val main = Handler(Looper.getMainLooper())
     @Volatile private var writeFailed = false
     /** True from Stop until the files are written and the service is switched off. */
     @Volatile private var saving = false
@@ -128,9 +139,104 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         when (intent?.action) {
             ACTION_STOP -> stopRide()
             ACTION_START -> startRide()
-            else -> stopSelf()   // nothing else is a command: never start a ride on a stray intent
+            ACTION_ARM -> arm()
+            ACTION_DISARM -> disarm()
+            else -> if (!armed && session == null && !saving) stopSelf()   // nothing else is a command: never start a ride on a stray intent
         }
         return START_NOT_STICKY
+    }
+
+    /** The foreground types this service may use now. Connected-device needs the Bluetooth connect permission. */
+    @SuppressLint("InlinedApi")
+    private fun foregroundTypes(): Int {
+        var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        if (Build.VERSION.SDK_INT < 31 || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        }
+        return types
+    }
+
+    // ----- quick start: armed between rides -----
+
+    /** Started while the app is on screen, so Android lets it keep the location type. A Start from the watch then needs no new foreground start. */
+    private fun arm() {
+        armed = true
+        ensureChannel()
+        if (session == null && !saving) showArmed()
+        startWatchLink()
+    }
+
+    private fun disarm() {
+        armed = false
+        stopWatchLink()
+        if (session == null && !saving) {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    private fun showArmed() {
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, readyNotification(), foregroundTypes())
+        } catch (e: SecurityException) {   // the location or notification permission was withdrawn: nothing to arm
+            armed = false
+            stopWatchLink()
+            stopSelf()
+        }
+    }
+
+    /** Between rides: back to the Start notification if armed, otherwise the service switches itself off. */
+    private fun backToIdle() {
+        if (armed) showArmed() else {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    private fun startWatchLink() {
+        if (watchLink != null) return
+        watchLink = WatchLink(this, { watchAddress(this) }, ::onWatchCommand).also { it.start() }
+    }
+
+    private fun stopWatchLink() {
+        watchLink?.stop()
+        watchLink = null
+    }
+
+    /** Runs on the watch link's thread: answers at once, and does the real work on the main thread. */
+    private fun onWatchCommand(command: WatchCommand): String = when (command) {
+        WatchCommand.Status -> WatchProtocol.encode(watchState())
+        WatchCommand.Start -> watchStart()
+        WatchCommand.Stop -> {
+            if (session != null) main.post { stopRide() }
+            WatchProtocol.OK
+        }
+    }
+
+    private fun watchStart(): String {
+        if (saving) return WatchProtocol.err("busy")
+        if (session != null) return WatchProtocol.OK                   // already riding: starting again is not an error
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return WatchProtocol.err("no-permission")
+        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return WatchProtocol.err("gps-off")
+        main.post { startRide() }                                      // a second Start before this runs is ignored by startRide's own guard
+        return WatchProtocol.OK
+    }
+
+    private fun watchState(): WatchState {
+        val s = session
+        val ui = RideStore.state.value
+        val cam = CameraController.ui.value
+        val ride = when {
+            saving -> RideState.Saving
+            s != null -> RideState.Recording
+            else -> RideState.Idle
+        }
+        return WatchState(
+            ride = ride,
+            elapsedSeconds = if (s != null) ((System.currentTimeMillis() - s.startUtc) / 1000).coerceAtLeast(0) else 0,
+            gps = when { ride != RideState.Recording -> GpsState.Off; ui.fixes == 0 -> GpsState.Searching; else -> GpsState.Fix },
+            camera = when { cam.error -> CameraState.Problem; cam.recording == true -> CameraState.Recording; cam.ready -> CameraState.Ready; else -> CameraState.None },
+        )
     }
 
     @SuppressLint("MissingPermission", "InlinedApi")
@@ -138,30 +244,24 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         if (session != null || saving) return
         writeFailed = false
         ensureChannel()
-        // Must follow startForegroundService() within a few seconds, so do it before anything else. The connected-device
-        // type is only allowed when the Bluetooth connect permission is granted.
-        var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-        if (Build.VERSION.SDK_INT < 31 || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        }
+        // Must follow startForegroundService() within a few seconds, so do it before anything else.
         try {
-            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification("Starting"), types)
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification("Starting"), foregroundTypes())
         } catch (e: SecurityException) {   // Android 14 and later refuse the location type without the permission
             RideStore.update { it.copy(message = Note("Location permission is missing.", needsSettings = true)) }
+            armed = false
             stopSelf()
             return
         }
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             RideStore.update { it.copy(message = Note("Location permission is missing.", needsSettings = true)) }
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            backToIdle()
             return
         }
         if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
             RideStore.update { it.copy(message = Note("Location is switched off in the phone's settings.")) }
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            backToIdle()
             return
         }
 
@@ -173,8 +273,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             Session(dir, startUtc, startElapsed)
         } catch (e: IOException) {
             RideStore.update { it.copy(message = Note("Could not create the ride files: ${e.message}")) }
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            backToIdle()
             return
         }
         session = s
@@ -255,7 +354,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun stopRide() {
         val s = session
         if (s == null) {
-            if (!saving) stopSelf()   // a Stop during saving must not switch the service off under the writer
+            if (!saving && !armed) stopSelf()   // a Stop during saving must not switch the service off under the writer
             return
         }
         session = null
@@ -279,8 +378,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             } finally {
                 saving = false
                 RideStore.update { it.copy(saving = false) }
-                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                backToIdle()
             }
         }.start()
     }
@@ -409,7 +507,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         runCatching { locationManager.removeUpdates(this) }
         wakeLock?.let { if (it.isHeld) it.release() }
         session?.let { runCatching { it.close() } }
-        showReady(this)   // with quick start on, the Start button comes back once the ride is over
+        stopWatchLink()
         super.onDestroy()
     }
 
@@ -449,6 +547,26 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Ride logging", NotificationManager.IMPORTANCE_LOW))
         }
+        if (nm.getNotificationChannel(READY_CHANNEL_ID) == null) {
+            nm.createNotificationChannel(NotificationChannel(READY_CHANNEL_ID, "Quick start", NotificationManager.IMPORTANCE_LOW))
+        }
+    }
+
+    /** The notification while armed: the service is running, no ride yet. The Start button goes to this same service. */
+    private fun readyNotification(): Notification {
+        val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val start = PendingIntent.getService(
+            this, 2, Intent(this, LoggerService::class.java).setAction(ACTION_START), PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Builder(this, READY_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle("Nano Dash is ready")
+            .setContentText("Start a ride here or from your watch")
+            .setOngoing(true)
+            .setSilent(true)
+            .setContentIntent(open)
+            .addAction(0, "Start ride", start)
+            .build()
     }
 
     private fun notification(text: String): Notification {
@@ -487,43 +605,36 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             context.startService(Intent(context, LoggerService::class.java).setAction(ACTION_STOP))
         }
 
-        // ----- quick start: a quiet notification with a Start button, so a watch that mirrors notifications can start a ride -----
+        // ----- quick start: the service stays armed between rides, with a Start notification and a listener for the watch -----
+        const val ACTION_ARM = "dev.nanodash.logger.ARM"
+        const val ACTION_DISARM = "dev.nanodash.logger.DISARM"
         private const val READY_CHANNEL_ID = "ready"
 
         private fun prefs(context: Context) = context.getSharedPreferences("nanodash", Context.MODE_PRIVATE)
 
         fun quickStartEnabled(context: Context): Boolean = prefs(context).getBoolean("quick_start", false)
 
-        /** Off by default: while it is on, a "Start ride" notification stays on the phone whenever no ride is running. */
+        /** The paired device the rider chose as their watch; the phone serves no other device. Null until one is chosen. */
+        fun watchAddress(context: Context): String? = prefs(context).getString("watch_address", null)
+
+        fun watchName(context: Context): String? = prefs(context).getString("watch_name", null)
+
+        fun setWatch(context: Context, address: String, name: String) =
+            prefs(context).edit().putString("watch_address", address).putString("watch_name", name).apply()
+
+        /** Off by default. On, the service stays running between rides (one quiet notification) so the watch can reach it. */
         fun setQuickStart(context: Context, on: Boolean) {
             prefs(context).edit().putBoolean("quick_start", on).apply()
-            if (on) showReady(context) else (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(NOTIFICATION_ID)
+            if (on) arm(context) else disarm(context)
         }
 
-        fun showReady(context: Context) {
-            if (!quickStartEnabled(context)) return
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (nm.getNotificationChannel(READY_CHANNEL_ID) == null) {
-                nm.createNotificationChannel(NotificationChannel(READY_CHANNEL_ID, "Quick start", NotificationManager.IMPORTANCE_LOW))
-            }
-            val open = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-            val start = PendingIntent.getForegroundService(
-                context, 2, Intent(context, LoggerService::class.java).setAction(ACTION_START), PendingIntent.FLAG_IMMUTABLE,
-            )
-            // Same id as the ride notification, so starting a ride replaces this one in place.
-            nm.notify(
-                NOTIFICATION_ID,
-                NotificationCompat.Builder(context, READY_CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-                    .setContentTitle("Nano Dash is ready")
-                    .setContentText("Start a ride here or from your watch")
-                    .setOngoing(true)
-                    .setSilent(true)
-                    .setLocalOnly(false)
-                    .setContentIntent(open)
-                    .addAction(0, "Start ride", start)
-                    .build(),
-            )
+        /** Call while the app is on screen: Android only lets a location service be started from the foreground. */
+        fun arm(context: Context) {
+            if (quickStartEnabled(context)) context.startForegroundService(Intent(context, LoggerService::class.java).setAction(ACTION_ARM))
+        }
+
+        private fun disarm(context: Context) {
+            context.startService(Intent(context, LoggerService::class.java).setAction(ACTION_DISARM))
         }
     }
 }

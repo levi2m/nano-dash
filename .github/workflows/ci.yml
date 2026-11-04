@@ -28,7 +28,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       - name: Test, lint and build
-        run: ./gradlew :core:test :app:lintDebug :app:assembleDebug :app:assembleRelease --console=plain
+        run: ./gradlew :core:test :app:lintDebug :wear:lintDebug :app:assembleDebug :app:assembleRelease :wear:assembleRelease --console=plain
 
   # Only this job holds a write token and the signing key, and only on a push to main after the tests passed.
   release:
@@ -73,7 +73,7 @@ jobs:
             "$RUNNER_TEMP/release.jks" "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" > keystore.properties
       - name: Build the signed release
         if: env.RELEASE == 'true'
-        run: ./gradlew :app:assembleRelease -PversionCode=${{ github.run_number }} --console=plain
+        run: ./gradlew :app:assembleRelease :wear:assembleRelease -PversionCode=${{ github.run_number }} --console=plain
       - name: Publish release
         if: env.RELEASE == 'true'
         env:
@@ -81,4 +81,5 @@ jobs:
         run: |
           tag="v$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)-${{ github.run_number }}"
           cp app/build/outputs/apk/release/app-release.apk "nano-dash-$tag.apk"
-          gh release create "$tag" "nano-dash-$tag.apk" --target "$GITHUB_SHA" --generate-notes
+          cp wear/build/outputs/apk/release/wear-release.apk "nano-dash-wear-$tag.apk"
+          gh release create "$tag" "nano-dash-$tag.apk" "nano-dash-wear-$tag.apk" --target "$GITHUB_SHA" --generate-notes
