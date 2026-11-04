@@ -77,6 +77,7 @@ private object Tokens {
 
 private const val HOLD_MS = 1_200f
 private const val SAVED_MS = 2_000L
+private const val REARM_MS = 3_000L
 private const val START_TIMEOUT_MS = 8_000L
 
 /** Picks the screen from the link and a few local facts, and turns taps into commands. */
@@ -264,6 +265,10 @@ private fun HoldToStop(onTick: () -> Unit, onStop: () -> Unit) {
     var progress by remember { mutableFloatStateOf(0f) }
     var fired by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    // If the phone did not stop (link lost), the button re-arms after a moment instead of staying dead.
+    LaunchedEffect(fired) {
+        if (fired) { delay(REARM_MS); fired = false; progress = 0f }
+    }
     Box(
         Modifier.fillMaxWidth(0.78f).height(64.dp).clip(RoundedCornerShape(32.dp)).background(Tokens.surface)
             .semantics {

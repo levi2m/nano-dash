@@ -59,9 +59,9 @@ Starting with no camera is allowed (state 3), exactly as on the phone: the ride 
     |    ready      |             |   fix  recording|            |    12:45     |
     |               |             |               |             |   (dimmed)    |
     |     Ready     |             |    12:45      |             |               |
-    |               |             |   (ember)     |             |   ring fills  |
-     \ [ Start ride ]/             \ [Hold to stop]/             \  around the  /
-      '-----------'                 '-----------'                 '-- button --'
+    |               |             |   (ember)     |             |   fills red   |
+     \ [ Start ride ]/             \ [Hold to stop]/             \ [#### stop  ]/
+      '-----------'                 '-----------'                 '-----------'
 ```
 
 ## 4. Interactions

@@ -2,7 +2,9 @@ package dev.nanodash.wear
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothClass
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
 import android.content.Context
 import dev.nanodash.core.watch.BoundedLineReader
 import dev.nanodash.core.watch.WatchCommand
@@ -44,9 +46,9 @@ class PhoneLink(private val context: Context) {
     private val _refusals = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val refusals: SharedFlow<String> = _refusals
 
-    private val commands = Channel<WatchCommand>(Channel.CONFLATED)
+    private val commands = Channel<Pair<WatchCommand, Long>>(Channel.CONFLATED)
 
-    fun send(command: WatchCommand) { commands.trySend(command) }
+    fun send(command: WatchCommand) { commands.trySend(command to System.currentTimeMillis()) }
 
     private val retry = Channel<Unit>(Channel.CONFLATED)
 
@@ -71,10 +73,7 @@ class PhoneLink(private val context: Context) {
     @SuppressLint("MissingPermission")
     private suspend fun session() = withContext(Dispatchers.IO) {
         val adapter = context.getSystemService(BluetoothManager::class.java).adapter ?: throw IOException("no Bluetooth")
-        val phone = adapter.bondedDevices.firstOrNull { it.bluetoothClass?.majorDeviceClass == BluetoothClass.Device.Major.PHONE }
-            ?: throw IOException("no paired phone")
-        phone.createRfcommSocketToServiceRecord(UUID.fromString(WatchProtocol.SERVICE_UUID)).use { socket ->
-            socket.connect()
+        connectToPhone(adapter.bondedDevices).use { socket ->
             val out = socket.outputStream
             val input = BoundedLineReader(BufferedInputStream(socket.inputStream))
             val scope: CoroutineScope = this
@@ -93,8 +92,9 @@ class PhoneLink(private val context: Context) {
 
             if (ask(WatchProtocol.HELLO) != WatchProtocol.OK) throw IOException("the phone does not speak this version")
             while (isActive) {
-                val command = commands.tryReceive().getOrNull()
-                if (command != null && command != WatchCommand.Status) {
+                val (command, at) = commands.tryReceive().getOrNull() ?: (null to 0L)
+                // a command that waited out a dropped link is dropped: it must never fire minutes later
+                if (command != null && command != WatchCommand.Status && System.currentTimeMillis() - at < COMMAND_MAX_AGE_MS) {
                     val reply = ask(command.name.uppercase())
                     if (reply.startsWith("ERR")) _refusals.tryEmit(reply.removePrefix("ERR").trim())
                 }
@@ -104,7 +104,36 @@ class PhoneLink(private val context: Context) {
         }
     }
 
+    /**
+     * Tries the phone that answered last, then phones and unclassified devices; headsets and the like are skipped.
+     * The one that connects is remembered.
+     */
+    @SuppressLint("MissingPermission")
+    private fun connectToPhone(bonded: Set<BluetoothDevice>): BluetoothSocket {
+        val prefs = context.getSharedPreferences("phone", Context.MODE_PRIVATE)
+        val last = prefs.getString("address", null)
+        val candidates = bonded.filter {
+            val major = it.bluetoothClass?.majorDeviceClass
+            it.address == last || major == null || major == BluetoothClass.Device.Major.PHONE || major == BluetoothClass.Device.Major.UNCATEGORIZED
+        }.sortedBy { it.address != last }
+        if (candidates.isEmpty()) throw IOException("no paired phone")
+        var failure: IOException? = null
+        for (device in candidates) {
+            val socket = device.createRfcommSocketToServiceRecord(UUID.fromString(WatchProtocol.SERVICE_UUID))
+            try {
+                socket.connect()
+                prefs.edit().putString("address", device.address).apply()
+                return socket
+            } catch (e: IOException) {
+                runCatching { socket.close() }
+                failure = e
+            }
+        }
+        throw failure ?: IOException("no paired phone")
+    }
+
     private companion object {
+        const val COMMAND_MAX_AGE_MS = 5_000L
         const val POLL_MS = 1_500L
         const val RETRY_MS = 3_000L
         const val EXCHANGE_TIMEOUT_MS = 5_000L

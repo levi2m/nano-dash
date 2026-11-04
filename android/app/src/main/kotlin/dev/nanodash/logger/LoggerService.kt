@@ -41,6 +41,7 @@ import dev.nanodash.core.watch.GpsState
 import dev.nanodash.core.watch.RideState
 import dev.nanodash.core.watch.WatchCommand
 import dev.nanodash.core.watch.WatchProtocol
+import dev.nanodash.core.watch.WatchStartRules
 import dev.nanodash.core.watch.WatchState
 import dev.nanodash.core.ride.ClockSkew
 import dev.nanodash.core.ride.GnssFix
@@ -214,10 +215,12 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     }
 
     private fun watchStart(): String {
-        if (saving) return WatchProtocol.err("busy")
-        if (session != null) return WatchProtocol.OK                   // already riding: starting again is not an error
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return WatchProtocol.err("no-permission")
-        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return WatchProtocol.err("gps-off")
+        if (session != null && !saving) return WatchProtocol.OK        // already riding: starting again is not an error
+        WatchStartRules.refusal(
+            saving,
+            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED,
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER),
+        )?.let { return WatchProtocol.err(it) }
         main.post { startRide() }                                      // a second Start before this runs is ignored by startRide's own guard
         return WatchProtocol.OK
     }

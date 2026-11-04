@@ -40,11 +40,14 @@ class WatchLink(
         thread = Thread({ listen() }, "watch-link").apply { isDaemon = true; start() }
     }
 
+    /** Waits briefly for the listener to end, so a quick stop then start never leaves two of them. */
     @Synchronized
     fun stop() {
         running = false
         runCatching { server?.close() }
         runCatching { client?.close() }
+        thread?.interrupt()
+        thread?.join(1_500)
         thread = null
     }
 
@@ -61,6 +64,8 @@ class WatchLink(
                 serve(socket)
             } catch (e: IOException) {
                 if (running) Thread.sleep(2_000)   // Bluetooth off or busy: try again shortly instead of spinning
+            } catch (e: InterruptedException) {
+                return                             // stop() asked us to end
             } catch (e: SecurityException) {
                 return                             // the Bluetooth permission was withdrawn
             } finally {
