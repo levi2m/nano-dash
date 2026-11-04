@@ -16,6 +16,7 @@ Ride logger for the DJI Osmo Nano on a motorcycle. It starts and stops the camer
 - Writes the `.fit` with the same record fields as Mimo's own export, on real timestamps, plus developer fields (lean angle, lateral and longitudinal acceleration, camera recording flag) estimated from the GPS track.
 - Controls several Nanos at once ("Choose cameras"). With cameras whose clocks differ, each gets its own `ride-<camera>.fit`.
 - Opens a ride's route in a maps app that reads GPX (OsmAnd, Organic Maps and others): tap the route preview on the ride. The app draws no map itself, so it needs no network.
+- Works with screen readers such as TalkBack: section titles are marked as headings, each status row is read as one phrase (for example "GPS: Location is on"), the route preview and the live speed have spoken descriptions, and every control is at least 48 dp. It follows the phone's light or dark theme and large font sizes. Checked with TalkBack on one phone; reports of anything that reads badly are welcome.
 - Shows its version and build number at the bottom of the screen, with a "Check for updates" button that opens the releases page in your browser. The app makes no request itself; compare the build number with the latest tag (`v0.1.0-24` is build 24).
 - Keeps everything on the phone. The app has no internet permission, and rides leave only when you tap Share.
 

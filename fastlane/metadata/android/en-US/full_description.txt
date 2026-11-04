@@ -9,6 +9,7 @@ Nano Dash is a ride logger for the DJI Osmo Nano motorcycle camera. It starts an
 <li>Controls several Nanos at once.</li>
 <li>Opens a ride's route in a maps app of your choice as GPX.</li>
 <li>Shows speed and distance in km or miles; you pick.</li>
+<li>Works with TalkBack and other screen readers: headings, spoken status and route descriptions, large touch targets, light and dark themes and large font sizes.</li>
 </ul>
 
 <b>Private by design</b>
