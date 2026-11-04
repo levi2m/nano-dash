@@ -11,4 +11,4 @@ Please report security problems privately through GitHub's "Report a vulnerabili
 
 ## Hardening in the app
 
-No internet permission; the service is not exported; the file provider only exposes the `rides/` folder; pending intents are immutable; backup and device transfer are off.
+No internet permission; the service is not exported; the file provider only exposes the `rides/` folder and a cache folder for temporary share copies; pending intents are immutable; backup and device transfer are off.

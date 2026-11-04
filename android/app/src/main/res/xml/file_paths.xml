@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <external-files-path name="rides" path="rides/" />
+    <!-- Share copies (GPX, export zip): in the cache so Delete and Android's cleanup remove them. -->
+    <cache-path name="exports" path="exports/" />
 </paths>

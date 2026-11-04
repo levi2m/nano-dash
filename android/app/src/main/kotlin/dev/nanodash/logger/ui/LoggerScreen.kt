@@ -116,6 +116,7 @@ fun LoggerScreen() {
 
     suspend fun reload() {
         rides = withContext(Dispatchers.IO) {
+            RideFiles.removeLegacyExports(context)
             val all = RideFiles.list(context)
             // A ride cut off before its .fit was written is rebuilt from its GPS log, but never while a ride is recording or being saved.
             val missing = if (ui.recording || ui.saving) emptyList() else all.filter { !it.hasFit && it.fixes > 0 }
@@ -213,7 +214,7 @@ fun LoggerScreen() {
                         unit = unit,
                         onOpenRoute = {
                             scope.launch {
-                                val gpx = java.io.File(RideFiles.root(context), "route.gpx")
+                                val gpx = java.io.File(RideFiles.exports(context), "route.gpx")
                                 if (withContext(Dispatchers.IO) { RideFolder.writeGpx(ride.dir, gpx) }) openRoute(context, gpx)
                             }
                         },
@@ -229,7 +230,7 @@ fun LoggerScreen() {
                             "Export all rides (${list.size})",
                             {
                                 scope.launch {
-                                    val zip = java.io.File(RideFiles.root(context), "nano-dash-rides.zip")
+                                    val zip = java.io.File(RideFiles.exports(context), "nano-dash-rides.zip")
                                     withContext(Dispatchers.IO) { RideFolder.zipAll(RideFiles.root(context), zip) }
                                     share(context, listOf(zip))
                                 }
@@ -275,7 +276,7 @@ fun LoggerScreen() {
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = null
-                    scope.launch { withContext(Dispatchers.IO) { RideFolder.delete(ride.dir) }; reload() }
+                    scope.launch { withContext(Dispatchers.IO) { RideFolder.delete(ride.dir); RideFiles.clearExports(context) }; reload() }
                 }) { Text("Delete", style = NanoText.button, color = c.bad) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Keep", style = NanoText.button, color = c.text) } },
