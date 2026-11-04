@@ -27,6 +27,8 @@ class WatchLink(
     private val context: Context,
     private val allowedAddress: () -> String?,
     private val handler: WatchHandler,
+    /** Called each time the chosen watch completes the handshake, so the app can show that the watch app has been seen. */
+    private val onWatchSeen: () -> Unit = {},
 ) {
     @Volatile private var running = false
     @Volatile private var server: BluetoothServerSocket? = null
@@ -84,6 +86,7 @@ class WatchLink(
         fun send(line: String) { out.write((line + "\n").toByteArray()); out.flush() }
         if (!WatchProtocol.isHello(input.readLine() ?: return)) { send(WatchProtocol.err("version")); return }
         send(WatchProtocol.OK)
+        onWatchSeen()
         while (running) {
             val line = input.readLine() ?: return
             val command = WatchProtocol.parseCommand(line) ?: continue             // unknown lines are ignored

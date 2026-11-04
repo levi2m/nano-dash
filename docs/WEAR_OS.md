@@ -165,3 +165,7 @@ Next: milestone 2, the armed phone service and the real handler.
 - **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: everything worked.
 
 **Still open:** the tile, a simpler way to install the watch app, the behaviour on other watches, and whether a ride started from the watch receives GPS fixes outdoors (the service type is chosen to allow it, but only a ride outdoors proves it).
+
+## 14. Getting the watch app onto the watch (decision)
+
+Wear OS has no sideload installer and only Google Play or ADB can install an app, so the phone app cannot push the APK. An in-app ADB client would need the INTERNET permission, which breaks the no-network promise. So the phone app carries a guide instead: a "Watch app" row under the quick start toggle shows "not seen yet" or "connected before" (the time the watch last finished the handshake is stored in the app's own preferences) and opens the install steps with a link to the latest release. No new permission. A watch-only store listing stays an option for later.

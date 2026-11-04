@@ -196,7 +196,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 
     private fun startWatchLink() {
         if (watchLink != null) return
-        watchLink = WatchLink(this, { watchAddress(this) }, ::onWatchCommand).also { it.start() }
+        watchLink = WatchLink(this, { watchAddress(this) }, ::onWatchCommand, onWatchSeen = { setWatchSeen(this) }).also { it.start() }
     }
 
     private fun stopWatchLink() {
@@ -621,6 +621,11 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         fun watchAddress(context: Context): String? = prefs(context).getString("watch_address", null)
 
         fun watchName(context: Context): String? = prefs(context).getString("watch_name", null)
+
+        /** When the watch app last completed a handshake with this phone, in ms since 1970; 0 if never. */
+        fun watchSeen(context: Context): Long = prefs(context).getLong("watch_seen", 0L)
+
+        private fun setWatchSeen(context: Context) = prefs(context).edit().putLong("watch_seen", System.currentTimeMillis()).apply()
 
         fun setWatch(context: Context, address: String, name: String) =
             prefs(context).edit().putString("watch_address", address).putString("watch_name", name).apply()

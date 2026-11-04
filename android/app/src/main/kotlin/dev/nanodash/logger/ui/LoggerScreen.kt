@@ -150,6 +150,7 @@ fun LoggerScreen() {
     var quickStart by remember { mutableStateOf(LoggerService.quickStartEnabled(context)) }
     var watchName by remember { mutableStateOf(LoggerService.watchName(context)) }
     var chooseWatch by remember { mutableStateOf(false) }
+    var watchGuide by remember { mutableStateOf(false) }
     // Quick start needs location (the service type), Bluetooth (the watch link) and notifications (the Start button).
     val quickStartPermissions = remember {
         buildList {
@@ -305,6 +306,13 @@ fun LoggerScreen() {
                     TextButton({ chooseWatch = true }, Modifier.heightIn(min = 48.dp)) {
                         Text("Watch: ${watchName ?: "none chosen"} (tap to choose)", style = NanoText.label, color = c.textSecondary)
                     }
+                    val seen = remember { LoggerService.watchSeen(context) } > 0
+                    TextButton({ watchGuide = true }, Modifier.heightIn(min = 48.dp)) {
+                        Text(
+                            "Watch app: ${if (seen) "connected before" else "not seen yet"} (tap for setup)",
+                            style = NanoText.label, color = c.textSecondary,
+                        )
+                    }
                 }
                 // Label-sized, so a footer link does not weigh as much as the actions above it; the 48 dp minimum keeps it easy to hit.
                 TextButton(
@@ -313,6 +321,29 @@ fun LoggerScreen() {
                 ) { Text("Check for updates (opens your browser)", style = NanoText.label, color = c.textSecondary) }
             }
         }
+    }
+
+    if (watchGuide) {
+        AlertDialog(
+            onDismissRequest = { watchGuide = false },
+            containerColor = c.card,
+            title = { Text("Put the watch app on your watch", style = NanoText.heading, color = c.text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+                    Text("Wear OS only installs apps from a computer or the Play Store, so this phone cannot send it. Once, with a computer:", style = NanoText.body, color = c.textSecondary)
+                    Text("1. Download the watch APK (nano-dash-wear) from the releases page.", style = NanoText.body, color = c.textSecondary)
+                    Text("2. On the watch: Settings, About watch, Software, tap Software version 7 times; then Developer options, turn on Debug over Wi-Fi.", style = NanoText.body, color = c.textSecondary)
+                    Text("3. On the computer: adb connect <watch address>, then adb install nano-dash-wear-<version>.apk", style = NanoText.body, color = c.textSecondary)
+                    Text("Then open Nano Dash on the watch. This row changes to connected.", style = NanoText.body, color = c.textSecondary)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }) { Text("Open releases page", style = NanoText.button, color = c.text) }
+            },
+            dismissButton = { TextButton(onClick = { watchGuide = false }) { Text("Close", style = NanoText.button, color = c.text) } },
+        )
     }
 
     if (chooseWatch) {
