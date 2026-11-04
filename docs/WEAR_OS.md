@@ -145,3 +145,13 @@ Cost: one quiet notification while it is on, and it must be switched on again af
 3. The watch screen: Start, Stop (hold), state.
 4. The tile.
 5. CI builds and releases both APKs; the docs and the roadmap follow.
+
+## 12. Milestone 1 result: the link works
+
+The spike (a minimal watch app and the phone's listener) was tested on a Galaxy S25 Ultra (Android 17) and a Galaxy Watch6 Classic (SM-R965F, Android API 36). The watch app found the paired phone, opened the secure Bluetooth serial channel, sent `HELLO 1` and `STATUS`, and the phone answered `OK` and `STATE idle 0 off none`.
+
+Two things the spike taught:
+- Do not call `cancelDiscovery()` on the watch: it needs the Bluetooth scan permission and nothing here scans. The watch app only needs the Bluetooth connect permission.
+- The on-watch screen is tiny, so every message must be short.
+
+Next: milestone 2, the armed phone service and the real handler.

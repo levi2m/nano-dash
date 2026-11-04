@@ -75,7 +75,6 @@ private fun askPhone(context: Context): String = try {
     val adapter = context.getSystemService(BluetoothManager::class.java).adapter ?: return "No Bluetooth"
     val phone = adapter.bondedDevices.firstOrNull { it.bluetoothClass?.majorDeviceClass == BluetoothClass.Device.Major.PHONE }
         ?: return "No paired phone found"
-    adapter.cancelDiscovery()
     phone.createRfcommSocketToServiceRecord(UUID.fromString(WatchProtocol.SERVICE_UUID)).use { socket ->
         socket.connect()
         socket.outputStream.write("${WatchProtocol.HELLO}\nSTATUS\n".toByteArray())
@@ -84,5 +83,5 @@ private fun askPhone(context: Context): String = try {
         "Phone says:\n${input.readLine()}\n${input.readLine()}"
     }
 } catch (e: Exception) {
-    "Failed: ${e.javaClass.simpleName}: ${e.message}"
+    "Failed: ${e.javaClass.simpleName}\n${e.message?.take(60)}"
 }
