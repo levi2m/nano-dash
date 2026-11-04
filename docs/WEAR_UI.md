@@ -94,11 +94,14 @@ Plain words, sentence case, no em dashes, short enough for a 1.47 inch screen. E
 
 ## 6. Accessibility
 
-- **Contrast:** every pair in the token table is above 5.7:1.
-- **Touch targets:** the main button is at least 60 dp; nothing else is tappable.
-- **TalkBack:** the timer reads as "Riding for 12 minutes 45 seconds", the status dots read as their words, and the Stop button exposes a **long-click action labelled "Stop ride"**, so a TalkBack user does not need to find a press-and-hold gesture.
+- **Contrast:** every pair in the token table is above 5.7:1. The hold-to-stop label is drawn twice, light on the dark pill and black on the red fill, with the red layer clipped to the progress, so the text is at least 6.29:1 (black on #F2575C) or 13.4:1 (light on #232325) at every moment of the hold.
+- **Touch targets:** the main button is at least 64 dp tall and grows with the font; nothing else is tappable. The secondary pill has a 1 dp #85858B outline (5.73:1 on black) so it is visible on the black ground.
+- **TalkBack, Stop:** a single activation must **not** stop the ride (owner decision, it keeps the accidental-stop guard). The button is spoken as "Hold to stop" (the visible text) with the state "Hold for about a second". Its click action is a deliberate no-op labelled "Use the Stop ride action to stop"; only the Actions menu entry **"Stop ride"** (long click) or a real press-and-hold stops the ride.
+- **TalkBack, status:** every screen has a pane title. "Saved" and the error messages are assertive live regions, "Ready", the spinners ("Starting ride", "Saving ride") and other messages are polite ones. Titles, "Ready" and the timer are headings. The timer is one merged node, "Riding for 12 minutes 45 seconds", with no live region (it would read every second). The status dots read as their words.
+- **Allow Bluetooth** uses the same pill (Button role) and message layout as the other screens.
 - **Not colour alone:** every dot has a word beside it.
-- **Large text:** the layout reflows; the hero scales and the status words wrap, never clip.
+- **Large text:** pills are at least 64 dp and grow, labels wrap, status words wrap, the message text scrolls above the button. The timer and the hero word follow the font scale up to 1.3x and then stop growing, so they fit a round screen. Reasoned, not yet tried on a device at 1.3x and 2x.
+- **Reduced motion:** with the system animation scale at 0 the spinner is a still arc.
 - **Haptics:** start, stop and error each have a different pattern, so they can be told apart without looking.
 
 ## 7. Not in the first version
@@ -112,3 +115,4 @@ Speed, a map, heart rate, a complication, and the tile (milestone 4: the same he
 - **No ambient screen of its own.** Wear OS leaves the app as it is and the watch's own timeout takes over.
 - **Spinner and pill buttons are drawn by the app** (the pill is 64 dp tall and 78 percent of the width), instead of using the library's edge button, so their size and feel are exactly as specified.
 - **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: start, the running screen, hold to stop, and the saved ride all work.
+- **Accessibility pass:** the hold-to-stop label is spoken as "Hold to stop" and never stops the ride on a single TalkBack activation; the label is two-colour so it stays readable while the red fills; state changes are announced (live regions, pane titles, headings); the spinner is still when animations are off; pills grow with the font; the secondary pill has an outline; the Allow pill is a proper button. Details in section 6.

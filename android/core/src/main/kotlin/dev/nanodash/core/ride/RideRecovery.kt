@@ -93,8 +93,4 @@ object RideRecovery {
         val shifted = spans.map { CameraSpan(it.startUtcMillis + shiftMs - phoneMinusGpsMs, it.endUtcMillis + shiftMs - phoneMinusGpsMs) }
         return BuiltFit(FitActivityWriter().encode(samples, shifted), samples.size)
     }
-
-    /** A complete .fit rebuilt from the files the logger left behind, or null if the log holds no GPS fixes. */
-    fun rebuildFit(gnssCsv: String, eventsJsonl: String? = null, shiftMs: Long = CameraTiming.FIT_SHIFT_MS): ByteArray? =
-        buildFit(parseGnssCsv(gnssCsv), clipSpansFromEvents(eventsJsonl), shiftMs)?.bytes
 }

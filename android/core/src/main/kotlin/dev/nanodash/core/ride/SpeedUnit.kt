@@ -5,9 +5,6 @@ enum class SpeedUnit(val speedLabel: String, val speedPerMps: Double, val distan
     Metric("km/h", 3.6, "km", 1000.0),
     Imperial("mph", 2.236936, "mi", 1609.344);
 
-    /** The other unit, for the switch at the bottom of the screen. */
-    val other: SpeedUnit get() = if (this == Metric) Imperial else Metric
-
     companion object {
         private val MILES = setOf("US", "GB", "LR", "MM")
 

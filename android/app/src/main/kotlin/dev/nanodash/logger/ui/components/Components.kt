@@ -20,10 +20,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,6 +111,23 @@ fun StatusRow(label: String, value: String, health: Health, modifier: Modifier =
                 textAlign = TextAlign.End,
             )
         }
+    }
+}
+
+/** True when the rider turned animations off (Remove animations or animator duration scale 0). */
+@Composable
+fun reducedMotion(): Boolean {
+    val context = LocalContext.current
+    return Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+}
+
+/** Busy bar: indeterminate normally, a static half-filled bar when animations are off. The text next to it says what is happening. */
+@Composable
+fun BusyBar(modifier: Modifier = Modifier) {
+    if (reducedMotion()) {
+        LinearProgressIndicator(progress = { 0.5f }, modifier = modifier, color = nanoColors.fill, trackColor = nanoColors.raised)
+    } else {
+        LinearProgressIndicator(modifier, color = nanoColors.fill, trackColor = nanoColors.raised)
     }
 }
 

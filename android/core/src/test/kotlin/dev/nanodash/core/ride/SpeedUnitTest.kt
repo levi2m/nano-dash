@@ -20,10 +20,8 @@ class SpeedUnitTest {
     }
 
     @Test
-    fun theRidersChoiceIsSavedByNameAndTheSwitchFlipsIt() {
+    fun theRidersChoiceIsSavedByName() {
         assertEquals(SpeedUnit.Metric, SpeedUnit.saved(SpeedUnit.Metric.name))
-        assertEquals(SpeedUnit.Imperial, SpeedUnit.Metric.other)
-        assertEquals(SpeedUnit.Metric, SpeedUnit.Imperial.other)
         assertNull(SpeedUnit.saved(null))
         assertNull(SpeedUnit.saved("furlongs"))                      // nothing valid saved: the language region decides
     }

@@ -108,6 +108,29 @@ class RideFolderTest {
     }
 
     @Test
+    fun theRideCardsDistanceIsTheFitsDistanceNotTheSumOfEveryStep() {
+        val dir = ride("ride-9", 1, finished = true)
+        // Three 1 s steps of about 111 m, then a 60 s hole with a jump across it, then a stop: only the first steps count.
+        val rows = listOf(0 to -20.00, 1 to -20.001, 2 to -20.002, 62 to -20.05, 63 to -20.05)
+        File(dir, "gnss.csv").writeText(header + rows.joinToString("\n") { (s, lat) -> "${s}000000000,${t0 + s * 1000L},$lat,-40.2,5.0,8.0,0.0,3.0,0.5,2.0,4.0" } + "\n")
+        File(dir, "route.txt").delete()
+        val card = assertNotNull(RideFolder.summarize(dir).distanceM)
+        val fit = RideAssembler().assemble(RideRecovery.parseGnssCsv(File(dir, "gnss.csv").readText())).last().distanceM
+        assertEquals(fit.toDouble(), card, 0.01)
+        assertTrue(card < 300.0, "the 5.3 km jump across the gap must not count: $card")
+    }
+
+    @Test
+    fun aFileLargerThanTheLimitIsNotReadWhole() {
+        val f = File(root, "big.txt").apply { writeText("0123456789") }
+        assertEquals("0123456789", RideFolder.readTextCapped(f, maxBytes = 10))
+        assertNull(RideFolder.readTextCapped(f, maxBytes = 9))
+        assertNull(RideFolder.readTextCapped(File(root, "missing.txt")))
+        val dir = ride("ride-10", 3, finished = false)   // a normal file is unaffected
+        assertEquals(3, RideFolder.summarize(dir).fixes)
+    }
+
+    @Test
     fun writeGpxNeedsFixesAndNamesTheTrackAfterTheRide() {
         val out = File(root, "route.gpx")
         assertFalse(RideFolder.writeGpx(ride("ride-5", 0, finished = true), out))

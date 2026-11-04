@@ -13,24 +13,16 @@ import kotlin.test.assertFalse
  */
 class ManifestPolicyTest {
     private val main = File("../app/src/main")
+    private val wear = File("../wear/src/main")
     private val androidNs = "http://schemas.android.com/apk/res/android"
 
     private fun parse(file: File) = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
 
-    @Test
-    fun theAppHasNoNetworkPermissionAndNoBackup() {
-        val doc = parse(File(main, "AndroidManifest.xml"))
-        val permissions = (0 until doc.getElementsByTagName("uses-permission").length).map {
-            doc.getElementsByTagName("uses-permission").item(it).attributes.getNamedItem("android:name").nodeValue
-        }
-        assertFalse(permissions.any { it.endsWith("INTERNET") }, "permissions: $permissions")
-        val app = doc.getElementsByTagName("application").item(0)
-        assertEquals("false", app.attributes.getNamedItemNS(androidNs, "allowBackup").nodeValue)
+    private fun permissions(doc: org.w3c.dom.Document) = (0 until doc.getElementsByTagName("uses-permission").length).map {
+        doc.getElementsByTagName("uses-permission").item(it).attributes.getNamedItemNS(androidNs, "name").nodeValue
     }
 
-    @Test
-    fun onlyTheLauncherActivityIsExported() {
-        val doc = parse(File(main, "AndroidManifest.xml"))
+    private fun exportedComponents(doc: org.w3c.dom.Document): Map<String, String> {
         val exported = mutableMapOf<String, String>()
         for (tag in listOf("activity", "service", "receiver", "provider")) {
             val nodes = doc.getElementsByTagName(tag)
@@ -39,7 +31,31 @@ class ManifestPolicyTest {
                 exported[attrs.getNamedItemNS(androidNs, "name").nodeValue] = attrs.getNamedItemNS(androidNs, "exported")?.nodeValue ?: "missing"
             }
         }
-        assertEquals(mapOf(".MainActivity" to "true", ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false"), exported)
+        return exported
+    }
+
+    private fun assertNoNetworkNoBackup(doc: org.w3c.dom.Document) {
+        val permissions = permissions(doc)
+        assertFalse(permissions.any { it.endsWith("INTERNET") }, "permissions: $permissions")
+        val app = doc.getElementsByTagName("application").item(0)
+        assertEquals("false", app.attributes.getNamedItemNS(androidNs, "allowBackup").nodeValue)
+    }
+
+    @Test
+    fun theAppHasNoNetworkPermissionAndNoBackup() = assertNoNetworkNoBackup(parse(File(main, "AndroidManifest.xml")))
+
+    @Test
+    fun theWatchAppHasNoNetworkPermissionAndNoBackup() = assertNoNetworkNoBackup(parse(File(wear, "AndroidManifest.xml")))
+
+    @Test
+    fun onlyTheLauncherActivityIsExported() {
+        val doc = parse(File(main, "AndroidManifest.xml"))
+        assertEquals(mapOf(".MainActivity" to "true", ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false"), exportedComponents(doc))
+    }
+
+    @Test
+    fun onlyTheWatchLauncherActivityIsExported() {
+        assertEquals(mapOf(".MainActivity" to "true"), exportedComponents(parse(File(wear, "AndroidManifest.xml"))))
     }
 
     @Test

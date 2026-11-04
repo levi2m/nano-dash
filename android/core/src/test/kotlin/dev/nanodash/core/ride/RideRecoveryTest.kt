@@ -14,6 +14,9 @@ class RideRecoveryTest {
 
     private fun csv(vararg rows: String) = header + rows.joinToString("\n") + "\n"
 
+    private fun rebuildFit(gnssCsv: String, eventsJsonl: String? = null, shiftMs: Long = CameraTiming.FIT_SHIFT_MS): ByteArray? =
+        RideRecovery.buildFit(RideRecovery.parseGnssCsv(gnssCsv), RideRecovery.clipSpansFromEvents(eventsJsonl), shiftMs)?.bytes
+
     @Test
     fun parsesTheLoggersCsvIncludingEmptyFields() {
         val fixes = RideRecovery.parseGnssCsv(
@@ -38,8 +41,8 @@ class RideRecoveryTest {
 
     @Test
     fun aHeaderOnlyLogGivesNoFit() {
-        assertNull(RideRecovery.rebuildFit(header))
-        assertNull(RideRecovery.rebuildFit(""))
+        assertNull(rebuildFit(header))
+        assertNull(rebuildFit(""))
     }
 
     @Test
@@ -47,7 +50,7 @@ class RideRecoveryTest {
         val rows = (0 until 30).map { i ->
             "${i * 1_000_000_000L},${1793676577000L + i * 1000L},${-20.265 + i * 0.0001},-40.295,5.0,10.0,0.0,3.0,0.5,2.0"
         }
-        val fit = assertNotNull(RideRecovery.rebuildFit(csv(*rows.toTypedArray())))
+        val fit = assertNotNull(rebuildFit(csv(*rows.toTypedArray())))
         assertEquals(".FIT", String(fit, 8, 4, Charsets.US_ASCII))
         assertTrue(fit.size > 200)
     }
@@ -142,14 +145,14 @@ class RideRecoveryTest {
 
     @Test
     fun fitTimesAreShiftedOntoTheCamerasClockByDefault() {
-        val fit = assertNotNull(RideRecovery.rebuildFit(fiveSeconds))
+        val fit = assertNotNull(rebuildFit(fiveSeconds))
         assertEquals(FitTime.fromUtcMillis(t0 - CameraTiming.CLOCK_BEHIND_PHONE_MS), timeCreated(fit))
     }
 
     @Test
     fun anExplicitShiftReplacesTheDefault() {
-        assertEquals(FitTime.fromUtcMillis(t0), timeCreated(assertNotNull(RideRecovery.rebuildFit(fiveSeconds, null, 0))))
-        assertEquals(FitTime.fromUtcMillis(t0 + 3_600_000), timeCreated(assertNotNull(RideRecovery.rebuildFit(fiveSeconds, null, 3_600_000))))
+        assertEquals(FitTime.fromUtcMillis(t0), timeCreated(assertNotNull(rebuildFit(fiveSeconds, null, 0))))
+        assertEquals(FitTime.fromUtcMillis(t0 + 3_600_000), timeCreated(assertNotNull(rebuildFit(fiveSeconds, null, 3_600_000))))
     }
 
     @Test

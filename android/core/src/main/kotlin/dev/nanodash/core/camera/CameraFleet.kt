@@ -10,8 +10,6 @@ import kotlinx.coroutines.coroutineScope
  * (an address, a label).
  */
 class CameraFleet(private val links: Map<String, CameraLink>) {
-    val ids: Set<String> get() = links.keys
-
     fun readyIds(): List<String> = links.filterValues { it.isReady() }.keys.toList()
 
     /** Starts every camera that is ready now (optionally only among [only]); the others are left out of the result. */

@@ -22,18 +22,6 @@ dependencies {
     testImplementation(libs.coroutines.test)
 }
 
-// gradle :core:rebuildFit -Pride=<ride folder or gnss.csv> -Pout=<output.fit> [-Pshift=<milliseconds>]
-tasks.register<JavaExec>("rebuildFit") {
-    group = "tools"
-    description = "Rebuild a ride's .fit from its gnss.csv"
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("dev.nanodash.core.tools.RebuildFitKt")
-    doFirst {
-        val shift = project.findProperty("shift")?.toString()
-        args(listOfNotNull(project.findProperty("ride")?.toString() ?: "", project.findProperty("out")?.toString() ?: "", shift))
-    }
-}
-
 tasks.test {
     useJUnitPlatform()
     testLogging {

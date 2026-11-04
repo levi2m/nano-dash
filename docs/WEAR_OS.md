@@ -27,6 +27,8 @@ The deciding question is whether A already gives a usable remote. It may, becaus
 
 ## 3. Recommended path
 
+Historical: sections 3 to 9 are the plan made before building. Stage 1 and 1b were built (section 10), Stage 0 showed the notification does not reach the watch, and sections 11 to 14 are what shipped.
+
 **Stage 0, a spike (no code):** on the real watch, start a ride and see what the watch shows. Questions to answer:
 1. Does the ongoing ride notification appear on the watch, with its Stop button?
 2. Is Stop reliable with the phone locked and the screen off?
@@ -34,7 +36,7 @@ The deciding question is whether A already gives a usable remote. It may, becaus
 
 **Stage 1, phone only, if Stage 0 mostly works:** make the notification a good watch citizen.
 - Set `setLocalOnly(false)` and add a `WearableExtender` with a clear "Stop ride" label, so mirroring is explicit and not left to a default.
-- Handle `ACTION_START` explicitly in `onStartCommand` (today any non-`ACTION_STOP` intent starts a ride; it is unreachable from other apps because the service is not exported, but it should say what it means).
+- Handle `ACTION_START` and `ACTION_STOP` explicitly in `onStartCommand` (done in build 36: an intent with any other action no longer starts a ride).
 - Keep the start path as it is: you start a ride on the phone, where you already approve permissions and see the camera status.
 
 **Stage 1b, optional, only if you want Start from the wrist:** an opt-in setting "Quick start from the watch" that shows a low-priority "Ready" notification while idle, with a **Start ride** action (`PendingIntent.getForegroundService`, immutable, explicit). Cost: a notification that sits there while the setting is on. Open question for the spike: whether a location foreground service may be started from a notification action while the app is in the background. Android allows a foreground-service start after the user acts on a notification, but the "while-in-use" location rule has its own exceptions. This has to be tried on the API 37 phone before anything is promised.
@@ -89,10 +91,10 @@ No new process, no new permission, no new network use. The only new code is in h
 - If more than one person wants Start from the wrist, Stage 1b becomes worth its idle notification.
 - If a watch GPS or heart-rate source is ever wanted, that is a separate project with its own design (time sync and merging), not an extension of this one.
 
-## 9. Open questions
+## 9. Open questions (answered)
 
-1. Which watch, and does it already show the ride notification with a Stop button? (Stage 0.)
-2. Is Start from the wrist wanted, or is Stop enough?
+1. Which watch, and does it show the ride notification with a Stop button? A Galaxy Watch6 Classic; it did not show it (section 11).
+2. Is Start from the wrist wanted? Yes, so the watch app has both (section 13).
 
 ## 10. What was built and what was found (build 36)
 
@@ -134,7 +136,7 @@ Cost: one quiet notification while it is on, and it must be switched on again af
 
 ### Safety on the watch
 
-- Stop needs a **press and hold**, so a stray tap cannot end a ride.
+- Stop needs a **press and hold**, so a stray tap cannot end a ride. TalkBack users get a "Stop ride" action instead of the hold (see [WEAR_UI.md](WEAR_UI.md)).
 - Start is a single tap.
 - If the phone is out of reach, the watch shows "Phone not reachable" and does nothing else.
 

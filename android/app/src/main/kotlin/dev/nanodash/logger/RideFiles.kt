@@ -15,7 +15,4 @@ object RideFiles {
     fun exports(context: Context): File = File(context.cacheDir, "exports").apply { mkdirs() }
 
     fun clearExports(context: Context) { File(context.cacheDir, "exports").deleteRecursively() }
-
-    /** Earlier builds wrote these beside the rides, where Delete did not reach them. */
-    fun removeLegacyExports(context: Context) { listOf("route.gpx", "nano-dash-rides.zip").forEach { File(root(context), it).delete() } }
 }

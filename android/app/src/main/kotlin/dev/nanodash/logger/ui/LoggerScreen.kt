@@ -31,14 +31,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -56,7 +54,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import dev.nanodash.core.watch.WatchFormat
+import dev.nanodash.logger.ui.components.BusyBar
+import java.io.IOException
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.ui.platform.LocalConfiguration
@@ -131,9 +136,12 @@ fun LoggerScreen() {
         onPauseOrDispose { }
     }
 
+    fun fileFailed() {
+        RideStore.update { it.copy(message = Note("Could not write the file. Is the phone full?")) }
+    }
+
     suspend fun reload() {
         rides = withContext(Dispatchers.IO) {
-            RideFiles.removeLegacyExports(context)
             val all = RideFiles.list(context)
             // A ride cut off before its .fit was written is rebuilt from its GPS log, but never while a ride is recording or being saved.
             val missing = if (ui.recording || ui.saving) emptyList() else all.filter { !it.hasFit && it.fixes > 0 }
@@ -173,10 +181,16 @@ fun LoggerScreen() {
         }.toTypedArray()
     }
     val quickStartLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+        // The switch only turns on when the watch link can work: location for the service type and, on Android 12+, Bluetooth.
+        val location = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val bluetooth = Build.VERSION.SDK_INT < 31 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        if (location && bluetooth) {
             quickStart = true
             LoggerService.setQuickStart(context, true)
             if (watchName == null) chooseWatch = true
+        } else {
+            RideStore.update { it.copy(message = Note("Quick start needs location and Bluetooth. Allow them in settings.", needsSettings = true)) }
         }
     }
     fun toggleQuickStart() {
@@ -264,12 +278,25 @@ fun LoggerScreen() {
                         onOpenRoute = {
                             scope.launch {
                                 val gpx = java.io.File(RideFiles.exports(context), "route.gpx")
-                                if (withContext(Dispatchers.IO) { RideFolder.writeGpx(ride.dir, gpx) }) openRoute(context, gpx)
+                                try {
+                                    if (withContext(Dispatchers.IO) { RideFolder.writeGpx(ride.dir, gpx) }) openRoute(context, gpx)
+                                } catch (e: IOException) {
+                                    fileFailed()
+                                }
                             }
                         },
                         onShareFit = { share(context, ride.fits) },
                         onShareAll = { share(context, ride.files) },
-                        onRebuild = { scope.launch { withContext(Dispatchers.IO) { RideFolder.rebuildFit(ride.dir) }; reload() } },
+                        onRebuild = {
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) { RideFolder.rebuildFit(ride.dir) }
+                                } catch (e: IOException) {
+                                    fileFailed()
+                                }
+                                reload()
+                            }
+                        },
                         onDelete = { confirmDelete = ride },
                     )
                 }
@@ -280,8 +307,22 @@ fun LoggerScreen() {
                             {
                                 scope.launch {
                                     val zip = java.io.File(RideFiles.exports(context), "nano-dash-rides.zip")
-                                    withContext(Dispatchers.IO) { RideFolder.zipAll(RideFiles.root(context), zip) }
-                                    share(context, listOf(zip))
+                                    val ok = try {
+                                        withContext(Dispatchers.IO) {
+                                            try {
+                                                RideFolder.zipAll(RideFiles.root(context), zip)
+                                            } catch (e: IOException) {
+                                                zip.delete()                  // never leave a half-written zip to be shared
+                                                throw e
+                                            }
+                                        }
+                                        true
+                                    } catch (e: IOException) {
+                                        fileFailed()
+                                        false
+                                    }
+                                    if (ok) share(context, listOf(zip))
+                                    reload()
                                 }
                             },
                             Modifier.fillMaxWidth(),
@@ -331,15 +372,25 @@ fun LoggerScreen() {
                     SectionLabel("Units")
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Speed", style = NanoText.body, color = c.text)
-                        Row(Modifier.clip(RoundedCornerShape(Radius.control)).background(c.bg)) {
+                        Row(
+                            Modifier.clip(RoundedCornerShape(Radius.control)).background(c.bg).selectableGroup()
+                                .semantics { contentDescription = "Speed unit" },
+                        ) {
                             SpeedUnit.entries.forEach { option ->
                                 val selected = option == unit
                                 Box(
-                                    Modifier.heightIn(min = 48.dp).clickable(role = Role.RadioButton) { unit = option; prefs.edit().putString("speed_unit", option.name).apply() }
-                                        .semantics { this.selected = selected }
-                                        .background(if (selected) c.accent else c.bg).padding(horizontal = Space.m),
+                                    Modifier.heightIn(min = 48.dp)
+                                        .selectable(selected = selected, role = Role.RadioButton, onClick = { unit = option; prefs.edit().putString("speed_unit", option.name).apply() })
+                                        .background(if (selected) c.fill else c.bg).padding(horizontal = Space.m),
                                     contentAlignment = Alignment.Center,
-                                ) { Text(option.speedLabel, style = NanoText.label, color = if (selected) c.onAccent else c.textSecondary) }
+                                ) {
+                                    // Bold as well as filled, so the choice does not rest on colour alone.
+                                    Text(
+                                        option.speedLabel,
+                                        style = NanoText.label.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
+                                        color = if (selected) c.onFill else c.textSecondary,
+                                    )
+                                }
                             }
                         }
                     }
@@ -353,14 +404,14 @@ fun LoggerScreen() {
                             Text("Quick start from the watch", style = NanoText.body, color = c.text)
                             Text("Adds one quiet notification", style = NanoText.label, color = c.textMuted)
                         }
-                        Switch(quickStart, null, colors = SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
+                        Switch(quickStart, null, colors = SwitchDefaults.colors(checkedTrackColor = c.fill, checkedThumbColor = c.onFill))
                     }
                     if (quickStart) {
-                        SettingRow("Watch", watchName ?: "None chosen") { chooseWatch = true }
-                        SettingRow("Watch app", if (LoggerService.watchSeen(context) > 0) "Connected before" else "Not seen yet") { watchGuide = true }
+                        SettingRow("Watch", watchName ?: "None chosen", "Choose the watch") { chooseWatch = true }
+                        SettingRow("Watch app", if (LoggerService.watchSeen(context) > 0) "Connected before" else "Not seen yet", "Show how to install the watch app") { watchGuide = true }
                     }
                     SectionLabel("About", Modifier.padding(top = Space.m))
-                    SettingRow("Check for updates", "Opens your browser") {
+                    SettingRow("Check for updates", "Opens your browser", "Open the releases page in your browser") {
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     }
                 }
@@ -440,7 +491,7 @@ private fun Header(onSettings: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = Space.s), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.m)) {
         RouteMark(Modifier.size(40.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-            Text("Nano Dash", style = NanoText.title, color = nanoColors.text)
+            Text("Nano Dash", Modifier.semantics { heading() }, style = NanoText.title, color = nanoColors.text)
             Text("Ride logger for the Osmo Nano", style = NanoText.label, color = nanoColors.textMuted)
         }
         TextButton(onSettings, Modifier.heightIn(min = 48.dp)) { Text("Settings", style = NanoText.button, color = nanoColors.text) }
@@ -449,9 +500,9 @@ private fun Header(onSettings: () -> Unit) {
 
 /** A tappable settings row: the name on the left, its current value on the right. */
 @Composable
-private fun SettingRow(title: String, value: String, onClick: () -> Unit) {
+private fun SettingRow(title: String, value: String, actionLabel: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onClick),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClickLabel = actionLabel, role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(title, style = NanoText.body, color = nanoColors.text)
@@ -469,16 +520,30 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadine
             Box(Modifier.fillMaxWidth().heightIn(min = 96.dp), contentAlignment = Alignment.CenterStart) {
                 val mps = ui.lastSpeedMps
                 if (mps != null) {
-                    Row(Modifier.semantics(mergeDescendants = true) { contentDescription = "Speed %.0f %s".format(mps * unit.speedPerMps, unit.speedLabel) }) {
-                        Text("%.0f".format(mps * unit.speedPerMps), Modifier.alignByBaseline(), style = NanoText.hero, color = c.accentText)
-                        Text(unit.speedLabel, Modifier.padding(start = Space.s).alignByBaseline(), style = NanoText.heading, color = c.textSecondary)
+                    val speedText = "%.0f".format(mps * unit.speedPerMps)
+                    val speakSpeed = Modifier.semantics(mergeDescendants = true) { contentDescription = "Speed $speedText ${unit.speedLabel}" }
+                    if (LocalDensity.current.fontScale > 1.3f) {
+                        // At large font sizes the unit goes under the figure so the 88 sp number never runs off the card.
+                        Column(speakSpeed) {
+                            Text(speedText, style = NanoText.hero, color = c.accentText)
+                            Text(unit.speedLabel, style = NanoText.heading, color = c.textSecondary)
+                        }
+                    } else {
+                        Row(speakSpeed) {
+                            Text(speedText, Modifier.alignByBaseline(), style = NanoText.hero, color = c.accentText)
+                            Text(unit.speedLabel, Modifier.padding(start = Space.s).alignByBaseline(), style = NanoText.heading, color = c.textSecondary)
+                        }
                     }
                 } else {
                     Text("Waiting for GPS", style = NanoText.title, color = c.textSecondary)
                 }
             }
             val s = ((now - ui.startedUtcMillis) / 1000).coerceAtLeast(0)
-            Text("%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60), style = NanoText.figure, color = c.text)
+            Text(
+                "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60),
+                Modifier.semantics { contentDescription = "Riding for ${WatchFormat.spoken(s)}" },
+                style = NanoText.figure, color = c.text,
+            )
         } else {
             Text("Ready", Modifier.semantics { heading() }, style = NanoText.title, color = c.text)
             Notice("Start a ride to log GPS and motion. The camera starts with it when it is connected.")
@@ -492,13 +557,18 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadine
                 GpsReadiness.NeedsPermission -> "Asked for when you start" to Health.Off
             }
             ui.fixes == 0 -> (if (ui.satellitesVisible != null) "Searching, ${ui.satellitesVisible} in view" else "Searching for satellites") to Health.Wait
-            else -> "${ui.lastAccuracyM?.let { "%.0f m".format(it) } ?: "no accuracy"}, ${ui.satellitesUsed ?: 0} satellites" to
-                (if ((ui.lastAccuracyM ?: 99f) <= 15f) Health.Ok else Health.Wait)
+            else -> {
+                val acc = ui.lastAccuracyM
+                // Weak is said in words, so the amber light is not the only difference between a good fix and a poor one.
+                if (acc != null && acc <= 15f) "%.0f m, ${ui.satellitesUsed ?: 0} satellites".format(acc) to Health.Ok
+                else (acc?.let { "%.0f m, weak".format(it) } ?: "No accuracy, weak") to Health.Wait
+            }
         }
         StatusRow("GPS", gpsValue, gpsHealth)
         val many = cam.rows.size > 1
         val (camValue, camHealth) = when {
-            cam.recording == true -> (if (many) "${cam.rows.count { it.recording == true }} of ${cam.rows.size} recording" else "Recording") to
+            cam.recording == true -> ((if (many) "${cam.rows.count { it.recording == true }} of ${cam.rows.size} recording" else "Recording") +
+                (if (cam.error) ", with a problem" else "")) to
                 (if (cam.error) Health.Wait else Health.Ok)
             cam.error -> "Problem" to Health.Bad
             cam.busy -> "Connecting" to Health.Wait
@@ -615,7 +685,7 @@ private fun CameraPanel(
             if (cam.rows.all { it.clockSet }) Notice("Camera clock set to this phone's time", health = Health.Off)
             else Notice("The camera did not take the phone's clock, so its time may be off and the overlay may be a second or two out", health = Health.Wait)
         }
-        if (cam.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = c.accent, trackColor = c.raised)
+        if (cam.busy) BusyBar(Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalAlignment = Alignment.CenterVertically) {
             NanoButton(
                 if (cam.rows.isNotEmpty()) "Reconnect" else "Connect camera", onConnect, Modifier.weight(1f), ButtonKind.Secondary,
@@ -635,7 +705,7 @@ private fun CameraPicker(cam: CameraUi, onToggle: (String) -> Unit, onConnectSel
     when {
         cam.scanning -> {
             Text("Looking for cameras", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = NanoText.body, color = c.textSecondary)
-            LinearProgressIndicator(Modifier.fillMaxWidth(), color = c.accent, trackColor = c.raised)
+            BusyBar(Modifier.fillMaxWidth())
         }
         cam.found.isEmpty() -> {
             Text(
@@ -654,7 +724,7 @@ private fun CameraPicker(cam: CameraUi, onToggle: (String) -> Unit, onConnectSel
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Space.m),
                     ) {
-                        Checkbox(checked, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = c.accent, checkmarkColor = c.bg, uncheckedColor = c.textMuted))
+                        Checkbox(checked, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = c.fill, checkmarkColor = c.onFill, uncheckedColor = c.textMuted))
                         Text(cameraLabel(address), style = NanoText.body, color = c.text)
                     }
                 }

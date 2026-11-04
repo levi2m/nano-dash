@@ -31,7 +31,6 @@ object FitTime {
 
     /** FIT times are whole seconds. Rounded, not cut: cutting labels the sample half a second early on average. */
     fun fromUtcMillis(utcMillis: Long): Long = (Math.floorDiv(utcMillis + 500, 1000L) - EPOCH_OFFSET_S).coerceAtLeast(0)
-    fun toUtcMillis(fitSeconds: Long): Long = (fitSeconds + EPOCH_OFFSET_S) * 1000
 }
 
 /** CRC-16 used by FIT (the reflected 0xA001 polynomial, initial value 0). */

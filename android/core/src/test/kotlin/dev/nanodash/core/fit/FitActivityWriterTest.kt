@@ -174,9 +174,9 @@ class FitActivityWriterTest {
     }
 
     @Test
-    fun timeConversionRoundTrips() {
-        assertEquals(631_065_600_000L, FitTime.toUtcMillis(0))
-        assertEquals(start, FitTime.toUtcMillis(FitTime.fromUtcMillis(start)))
+    fun timeConversionIsRoundedFromTheFitEpoch() {
+        assertEquals(0L, FitTime.fromUtcMillis(631_065_600_000L))
+        assertEquals(1L, FitTime.fromUtcMillis(631_065_600_000L + 600))   // rounded to the nearest second, not cut
     }
 
     @Test

@@ -17,7 +17,7 @@ android {
         minSdk = 31   // the Bluetooth connect permission and the vibrator manager arrive in API 31 (Wear OS 4); older watches are left out
         targetSdk = 37
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1   // CI passes its run number, as for the phone app
-        versionName = "0.1.0"
+        versionName = providers.gradleProperty("nanodash.versionName").get()   // from gradle.properties
     }
 
     signingConfigs {

@@ -18,7 +18,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1   // CI passes its run number so every release is newer
-        versionName = "0.1.0"
+        versionName = providers.gradleProperty("nanodash.versionName").get()   // from gradle.properties
     }
 
     signingConfigs {

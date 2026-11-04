@@ -8,7 +8,7 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 - Timing: first frame, clip end and clock offset measured on a real camera (see [docs/SYNC.md](docs/SYNC.md)).
 - The `.fit` writer: our own encoder, parsed by two independent decoders, imported by Mimo.
 - Real rides, with the phone locked in a pocket, imported in Mimo and lined up with their clips. A short ride on build 32 (the 360 ms clock offset, rounded seconds and phone-versus-GPS correction) lined up too.
-- Public repository, a signed release from CI on every push to `main` (a separate job holds the signing key; actions pinned), and two security audits with their fixes.
+- Public repository, a signed release from CI on every push to `main` (the build job holds the signing key with a read-only token, a separate publish job has the write token; actions pinned by hash, Gradle wrapper validated, a check that no shipped manifest has the internet permission, and a SHA-256 and signing-certificate fingerprint published with each release), and two security audits with their fixes.
 - A Wear OS remote over our own Bluetooth link: Start on the watch, hold to stop, tested by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra.
 - Targeting Android 17 (API 37), running on an API 37 phone. Accessibility: touch targets, labels, headings, light theme, large font and landscape checked, and a person confirmed TalkBack reads it well (build 35).
 
@@ -30,7 +30,7 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
   - A Play build variant without the "Check for updates" button, because Play does not allow sending people elsewhere to download updates.
   - Store assets (512 px icon, 1024x500 feature graphic, at least two phone screenshots), a privacy policy URL (`PRIVACY.md` works), and the declaration forms: Data safety, content rating, ads, target audience, and the foreground-service declarations for the location and connected-device types, with a short demo video.
   - Care with the DJI name: nominative use only, no DJI logos, keep the unofficial disclaimer.
-  - A Wear OS listing only if a watch app is ever built. With the notification design in [docs/WEAR_OS.md](docs/WEAR_OS.md) there is no watch app to publish.
+  - A Wear OS listing for the watch app (see [docs/WEAR_OS.md](docs/WEAR_OS.md)) is a separate, later step.
 - **Android developer verification.** Google is rolling out identity verification for developers whose apps install on certified phones, sideloaded ones included, with Brazil among the first countries (reported for 30 September 2026; dates differ between sources and need checking on Google's pages). Registering in the Android Developer Console may be needed for the GitHub APK to keep installing, whether or not the app goes on Play.
 
 ## Left out, and why

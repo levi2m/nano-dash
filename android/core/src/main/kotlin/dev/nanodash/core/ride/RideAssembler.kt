@@ -125,6 +125,9 @@ class RideAssembler {
     }
 
     companion object {
+        /** The ride's distance as the .fit counts it, so the ride card and the file agree. Metres. */
+        fun distanceM(fixes: List<GnssFix>): Double = RideAssembler().assemble(fixes).lastOrNull()?.distanceM?.toDouble() ?: 0.0
+
         const val G = 9.80665
         private const val MAX_VERTICAL_ACCURACY_M = 20f
         private const val maxGapS = 3.0

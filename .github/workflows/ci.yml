@@ -3,13 +3,15 @@ name: ci
 on:
   push:
     branches: [main]   # pull requests are checked by the pull_request trigger
-    paths: [android/**, .github/workflows/**]   # docs-only pushes need no build or release
+    paths: [android/**, .github/workflows/**, scripts/**]   # docs-only pushes need no build or release
   pull_request:
 
 permissions:
   contents: read
 
 # Actions are pinned to commit hashes (the comment names the version); Dependabot moves them.
+# No job keeps the checkout token (persist-credentials: false). The signing key lives only in the "build" job, which has a
+# read-only token and hands the signed APKs on as an artifact; the "publish" job has a write token and no secrets.
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -18,6 +20,8 @@ jobs:
         working-directory: android
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           distribution: temurin
@@ -26,22 +30,28 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       - name: Test, lint and build
         run: ./gradlew :core:test :app:lintDebug :wear:lintDebug :app:assembleDebug :app:assembleRelease :wear:assembleRelease --console=plain
+      - name: Shipped manifests have no INTERNET permission
+        run: bash ../scripts/check-no-internet.sh
 
-  # Only this job holds a write token and the signing key, and only on a push to main after the tests passed.
-  release:
+  # Holds the signing key, with a read-only token, and only on a push to main after the tests passed. It publishes nothing itself.
+  build:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
+    # Owner step (docs/RELEASING.md): move the three secrets into this environment and restrict it to main. Until then the
+    # environment is created empty on first use, has no rules, and the repository-level secrets still reach this job.
+    environment: release
     concurrency:
-      group: release-${{ github.ref }}   # releases publish in order
+      group: release-build-${{ github.ref }}
       cancel-in-progress: false
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}   # empty when no key is configured: then there is nothing to publish
     env:
-      # Only a yes/no: whether the key is stored as a repository secret. The secrets themselves appear in the "Release key" step alone.
+      # Only a yes/no: whether the key is stored as a secret. The secrets themselves appear in the "Release key" step alone.
       RELEASE: ${{ secrets.KEYSTORE_B64 != '' }}
     defaults:
       run:
@@ -49,6 +59,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: env.RELEASE == 'true'
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         if: env.RELEASE == 'true'
         with:
@@ -59,6 +71,8 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
+        if: env.RELEASE == 'true'
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         if: env.RELEASE == 'true'
       - name: Release key
@@ -74,12 +88,54 @@ jobs:
       - name: Build the signed release
         if: env.RELEASE == 'true'
         run: ./gradlew :app:assembleRelease :wear:assembleRelease -PversionCode=${{ github.run_number }} --console=plain
-      - name: Publish release
+      - name: Collect the release files
+        id: meta
         if: env.RELEASE == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          tag="v$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk "nano-dash-$tag.apk"
-          cp wear/build/outputs/apk/release/wear-release.apk "nano-dash-wear-$tag.apk"
-          gh release create "$tag" "nano-dash-$tag.apk" "nano-dash-wear-$tag.apk" --target "$GITHUB_SHA" --generate-notes
+          version=$(sed -n 's/^nanodash\.versionName=//p' gradle.properties)
+          tag="v$version-${{ github.run_number }}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]] || { echo "unexpected tag: $tag" >&2; exit 1; }
+          bash ../scripts/check-no-internet.sh
+          out="$RUNNER_TEMP/dist"
+          mkdir "$out"
+          cp app/build/outputs/apk/release/app-release.apk "$out/nano-dash-$tag.apk"
+          cp wear/build/outputs/apk/release/wear-release.apk "$out/nano-dash-wear-$tag.apk"
+          bash ../scripts/release-info.sh "$out/nano-dash-$tag.apk" "$out/nano-dash-wear-$tag.apk" > "$out/notes.md"
+          cat "$out/notes.md"
+          (cd "$out" && for f in nano-dash-*.apk; do sha256sum "$f" > "$f.sha256"; done)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: env.RELEASE == 'true'
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  # Holds a write token and no secrets, and runs no project code: it only takes the files the build job made and publishes them.
+  publish:
+    needs: build
+    if: needs.build.outputs.tag != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: release-publish-${{ github.ref }}   # releases publish in order
+      cancel-in-progress: false
+    env:
+      TAG: ${{ needs.build.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: dist
+      - name: Publish release
+        run: |
+          cd dist
+          sha256sum -c ./*.sha256
+          # The tag is created here, on the commit that was built, so that --verify-tag can refuse a release without it.
+          gh api "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$TAG" -f "sha=$GITHUB_SHA" > /dev/null
+          gh release create "$TAG" "nano-dash-$TAG.apk" "nano-dash-$TAG.apk.sha256" "nano-dash-wear-$TAG.apk" "nano-dash-wear-$TAG.apk.sha256" \
+            --verify-tag --generate-notes --notes-file notes.md

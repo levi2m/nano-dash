@@ -36,12 +36,14 @@ import dev.nanodash.core.camera.StartResult
 import dev.nanodash.core.camera.StopResult
 import dev.nanodash.core.camera.cameraLabel
 import dev.nanodash.core.fit.CameraSpan
+import dev.nanodash.core.service.ServiceRules
+import dev.nanodash.core.service.ServiceState
+import dev.nanodash.core.service.WatchStartDecision
 import dev.nanodash.core.watch.CameraState
 import dev.nanodash.core.watch.GpsState
 import dev.nanodash.core.watch.RideState
 import dev.nanodash.core.watch.WatchCommand
 import dev.nanodash.core.watch.WatchProtocol
-import dev.nanodash.core.watch.WatchStartRules
 import dev.nanodash.core.watch.WatchState
 import dev.nanodash.core.ride.ClockSkew
 import dev.nanodash.core.ride.GnssFix
@@ -91,6 +93,12 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     @Volatile private var writeFailed = false
     /** True from Stop until the files are written and the service is switched off. */
     @Volatile private var saving = false
+    /** A Stop from the watch was accepted and is queued on the main thread; a Start now would be undone by it (see [ServiceRules.watchStart]). */
+    @Volatile private var stopPending = false
+    /** A Start from the watch was accepted and is queued; a Stop that arrives now is queued behind it instead of being lost. */
+    @Volatile private var startPending = false
+
+    private fun serviceState() = ServiceState(armed = armed, riding = session != null, saving = saving)
 
     private class Session(val dir: File, val startUtc: Long, val startElapsedNs: Long) {
         val gnss = BufferedWriter(FileWriter(File(dir, "gnss.csv")), 1 shl 16)
@@ -132,6 +140,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         super.onCreate()
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        instance = this
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -142,7 +151,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             ACTION_START -> startRide()
             ACTION_ARM -> arm()
             ACTION_DISARM -> disarm()
-            else -> if (!armed && session == null && !saving) stopSelf()   // nothing else is a command: never start a ride on a stray intent
+            else -> if (ServiceRules.switchOffOnStrayIntent(serviceState())) stopSelf()   // nothing else is a command: never start a ride on a stray intent
         }
         return START_NOT_STICKY
     }
@@ -163,14 +172,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun arm() {
         armed = true
         ensureChannel()
-        if (session == null && !saving) showArmed()
-        startWatchLink()
+        if (ServiceRules.showReadyOnArm(serviceState())) showArmed()
+        startWatchLink()   // also the retry point: the app calls arm on every launch, so a link that died for a missing permission is replaced
     }
 
     private fun disarm() {
         armed = false
         stopWatchLink()
-        if (session == null && !saving) {
+        if (ServiceRules.switchOffOnDisarm(serviceState())) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -195,8 +204,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     }
 
     private fun startWatchLink() {
-        if (watchLink != null) return
-        watchLink = WatchLink(this, { watchAddress(this) }, ::onWatchCommand, onWatchSeen = { setWatchSeen(this) }).also { it.start() }
+        watchLink?.let { if (it.isRunning) return; it.stop() }   // a link that ended by itself (no Bluetooth permission) is replaced
+        watchLink =WatchLink(this, { watchAddress(this) }, ::onWatchCommand, onWatchSeen = { setWatchSeen(this) }).also { it.start() }
     }
 
     private fun stopWatchLink() {
@@ -209,20 +218,31 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         WatchCommand.Status -> WatchProtocol.encode(watchState())
         WatchCommand.Start -> watchStart()
         WatchCommand.Stop -> {
-            if (session != null) main.post { stopRide() }
+            if (session != null || startPending) {
+                stopPending = true
+                main.post { stopRide() }       // queued behind a Start that is still waiting, so that Start is not left running
+            }
             WatchProtocol.OK
         }
     }
 
+    // The watch Start is deliberately allowed while the phone is locked (the rider's phone is in a pocket); the notification's Start is not.
     private fun watchStart(): String {
-        if (session != null && !saving) return WatchProtocol.OK        // already riding: starting again is not an error
-        WatchStartRules.refusal(
-            saving,
+        val decision = ServiceRules.watchStart(
+            serviceState(),
+            stopPending,
             checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED,
             locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER),
-        )?.let { return WatchProtocol.err(it) }
-        main.post { startRide() }                                      // a second Start before this runs is ignored by startRide's own guard
-        return WatchProtocol.OK
+        )
+        return when (decision) {
+            WatchStartDecision.AlreadyRiding -> WatchProtocol.OK        // starting again is not an error
+            is WatchStartDecision.Refuse -> WatchProtocol.err(decision.reason)
+            WatchStartDecision.Go -> {
+                startPending = true
+                main.post { startRide() }                               // a second Start before this runs is ignored by startRide's own guard
+                WatchProtocol.OK
+            }
+        }
     }
 
     private fun watchState(): WatchState {
@@ -244,7 +264,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 
     @SuppressLint("MissingPermission", "InlinedApi")
     private fun startRide() {
-        if (session != null || saving) return
+        startPending = false
+        if (!ServiceRules.canStartRide(serviceState())) return
         writeFailed = false
         ensureChannel()
         // Must follow startForegroundService() within a few seconds, so do it before anything else.
@@ -355,9 +376,10 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun stampJson(s: Stamp) = JSONObject().put("utc_ms", s.utcMillis).put("elapsed_ns", s.monoNanos)
 
     private fun stopRide() {
+        stopPending = false
         val s = session
         if (s == null) {
-            if (!saving && !armed) stopSelf()   // a Stop during saving must not switch the service off under the writer
+            if (ServiceRules.switchOffOnStopWithoutRide(serviceState())) stopSelf()   // a Stop during saving must not switch the service off under the writer
             return
         }
         session = null
@@ -379,9 +401,12 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             } catch (e: Throwable) {
                 RideStore.update { it.copy(message = Note("Could not finish the ride: ${e.message}. The GPS log was kept; use Rebuild .fit.")) }
             } finally {
-                saving = false
-                RideStore.update { it.copy(saving = false) }
-                backToIdle()
+                // On the main thread, in one step: a Start there between clearing `saving` and backToIdle() would begin a ride that backToIdle then kills.
+                main.post {
+                    saving = false
+                    RideStore.update { it.copy(saving = false) }
+                    backToIdle()
+                }
             }
         }.start()
     }
@@ -391,21 +416,33 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         // Stop the cameras first so the clips end with the ride. Cancelling the start job waits for a start command in flight.
         val spans = LinkedHashMap<String, CameraSpan>()          // one clip window per camera, by address
         val clips = ArrayList<RideRecovery.CameraClip>()
-        val started = runBlocking {
+        // Every camera that confirmed its start, and any whose start reply was lost but which says it is recording: it may well be.
+        val toStop = runBlocking {
             withTimeoutOrNull(15_000) { s.cameraJob?.cancelAndJoin() }
-            s.cameras.filterValues { it is StartResult.Started }
+            ServiceRules.camerasToStop(s.cameras, CameraController.ui.value.rows.associate { it.address to it.recording })
         }
         // The phone's clock against the GPS's: the camera's clock came from the phone, the .fit times from the GPS.
         val skewMs = ClockSkew.phoneMinusGpsMs(s.fixes, s.startUtc, s.startElapsedNs)
         s.skewMs = skewMs
-        if (started.isNotEmpty()) {
+        if (toStop.isNotEmpty()) {
             // All cameras stop at once. Long enough for a link that dropped to come back (up to 2 x 12 s) and then stop (up to 15 s).
-            val stops = runBlocking { withTimeoutOrNull(45_000) { runCatching { CameraController.stopRecording(started.keys) }.getOrDefault(emptyMap()) } } ?: emptyMap()
+            val stops = runBlocking { withTimeoutOrNull(45_000) { runCatching { CameraController.stopRecording(toStop) }.getOrDefault(emptyMap()) } } ?: emptyMap()
             val unconfirmed = mutableListOf<String>()
-            for ((address, start) in started) {
+            val untimed = mutableListOf<String>()      // stopped although their start was never confirmed: no clip window can be worked out
+            for (address in toStop) {
+                val start = s.cameras[address] as? StartResult.Started
                 val stop = stops[address]
                 if (stop !is StopResult.Stopped) { unconfirmed += cameraLabel(address); continue }
-                val span = CameraTiming.clipSpan(start as StartResult.Started, stop)
+                if (start == null) {
+                    untimed += cameraLabel(address)
+                    s.event(
+                        JSONObject().put("event", "camera_stop_untimed").put("camera", cameraLabel(address))
+                            .put("command_sent", stampJson(stop.commandSent)).put("reply", stampJson(stop.replyAt))
+                            .put("flag_cleared", stop.flagClearedAt?.let { stampJson(it) } ?: JSONObject.NULL),
+                    )
+                    continue
+                }
+                val span = CameraTiming.clipSpan(start, stop)
                 val shift = CameraController.fitShiftMs(address) + (skewMs ?: 0)
                 if (span != null) { spans[address] = span; clips += RideRecovery.CameraClip(cameraLabel(address), span, shift, skewMs ?: 0) }
                 s.event(
@@ -416,7 +453,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                         .put("clip_span_estimate_utc_ms", span?.let { listOf(it.startUtcMillis, it.endUtcMillis) }?.let { org.json.JSONArray(it) } ?: JSONObject.NULL),
                 )
             }
-            RideStore.update { it.copy(cameraNote = CameraNotes.stopNote(started.size, unconfirmed)?.let { text -> Note(text) }) }
+            val note = listOfNotNull(CameraNotes.stopNote(toStop.size, unconfirmed), ServiceRules.strayStopNote(untimed)).joinToString(" ")
+            RideStore.update { ui -> ui.copy(cameraNote = note.takeIf { n -> n.isNotEmpty() }?.let { text -> Note(text) }) }
         }
 
         val endUtc = System.currentTimeMillis()
@@ -511,6 +549,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         wakeLock?.let { if (it.isHeld) it.release() }
         session?.let { runCatching { it.close() } }
         stopWatchLink()
+        if (instance === this) instance = null
         super.onDestroy()
     }
 
@@ -561,6 +600,12 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         val start = PendingIntent.getService(
             this, 2, Intent(this, LoggerService::class.java).setAction(ACTION_START), PendingIntent.FLAG_IMMUTABLE,
         )
+        // A locked phone must not start a ride from the notification shade: Android asks for the unlock first (API 31 and later, where Android offers this;
+        // older versions cannot require it). The watch's Start is different on purpose: the rider's
+        // phone is locked in a pocket, so LoggerService.watchStart does not require an unlock.
+        val startAction = NotificationCompat.Action.Builder(0, "Start ride", start)
+            .apply { if (Build.VERSION.SDK_INT >= 31) setAuthenticationRequired(true) }
+            .build()
         return NotificationCompat.Builder(this, READY_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle("Nano Dash is ready")
@@ -568,7 +613,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(open)
-            .addAction(0, "Start ride", start)
+            .addAction(startAction)
             .build()
     }
 
@@ -627,8 +672,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 
         private fun setWatchSeen(context: Context) = prefs(context).edit().putLong("watch_seen", System.currentTimeMillis()).apply()
 
-        fun setWatch(context: Context, address: String, name: String) =
+        /** The running service, if any, so choosing a watch can cut the connection of the one chosen before. Set and cleared on the main thread. */
+        @Volatile private var instance: LoggerService? = null
+
+        fun setWatch(context: Context, address: String, name: String) {
             prefs(context).edit().putString("watch_address", address).putString("watch_name", name).apply()
+            // Authorisation is checked when a watch connects (and on each command), so a device allowed before must be cut now.
+            instance?.main?.post { instance?.let { it.watchLink?.dropClient(); if (it.armed) it.startWatchLink() } }
+        }
 
         /** Off by default. On, the service stays running between rides (one quiet notification) so the watch can reach it. */
         fun setQuickStart(context: Context, on: Boolean) {
