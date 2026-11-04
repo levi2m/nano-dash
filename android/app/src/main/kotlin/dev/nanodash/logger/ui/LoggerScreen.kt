@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -311,7 +312,7 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadine
             Box(Modifier.fillMaxWidth().heightIn(min = 96.dp), contentAlignment = Alignment.CenterStart) {
                 val mps = ui.lastSpeedMps
                 if (mps != null) {
-                    Row {
+                    Row(Modifier.semantics(mergeDescendants = true) { contentDescription = "Speed %.0f %s".format(mps * unit.speedPerMps, unit.speedLabel) }) {
                         Text("%.0f".format(mps * unit.speedPerMps), Modifier.alignByBaseline(), style = NanoText.hero, color = c.accentText)
                         Text(unit.speedLabel, Modifier.padding(start = Space.s).alignByBaseline(), style = NanoText.heading, color = c.textSecondary)
                     }
@@ -322,7 +323,7 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadine
             val s = ((now - ui.startedUtcMillis) / 1000).coerceAtLeast(0)
             Text("%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60), style = NanoText.figure, color = c.text)
         } else {
-            Text("Ready", style = NanoText.title, color = c.text)
+            Text("Ready", Modifier.semantics { heading() }, style = NanoText.title, color = c.text)
             Notice("Start a ride to log GPS and motion. The camera starts with it when it is connected.")
         }
         Hairline()
@@ -515,7 +516,7 @@ private fun CameraPicker(cam: CameraUi, onToggle: (String) -> Unit, onConnectSel
 @Composable
 private fun EmptyRides() {
     Panel {
-        Text("No rides yet", style = NanoText.heading, color = nanoColors.text)
+        Text("No rides yet", Modifier.semantics { heading() }, style = NanoText.heading, color = nanoColors.text)
         Notice("1. Connect the camera if you have it with you.\n2. Start the ride before you move off.\n3. Stop it when you arrive, then share the .fit file and import it in Mimo together with the clip.")
     }
 }
@@ -528,7 +529,7 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onO
     Panel(bottomPadding = Space.s) {
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
-                Text(SimpleDateFormat("EEE d MMM, HH:mm", locale).format(Date(ride.startUtcMillis)), style = NanoText.heading, color = c.text)
+                Text(SimpleDateFormat("EEE d MMM, HH:mm", locale).format(Date(ride.startUtcMillis)), Modifier.semantics { heading() }, style = NanoText.heading, color = c.text)
                 Text("${ride.sizeKb} KB", style = NanoText.label, color = c.textMuted)
             }
             Text(ride.durationSeconds?.let(::clock) ?: "–", style = NanoText.bodyNumbers, color = c.textSecondary)

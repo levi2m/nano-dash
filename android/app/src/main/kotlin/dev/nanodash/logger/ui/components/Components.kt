@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -70,7 +71,7 @@ fun Panel(modifier: Modifier = Modifier, bottomPadding: Dp = Space.xl, content: 
 
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier, style = NanoText.heading, color = nanoColors.text)
+    Text(text, modifier.semantics { heading() }, style = NanoText.heading, color = nanoColors.text)
 }
 
 @Composable
