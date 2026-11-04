@@ -13,7 +13,7 @@ Ride logger for the DJI Osmo Nano on a motorcycle. It starts and stops the camer
 
 - Finds and pairs the camera, then starts and stops it with the ride. If the link drops it reconnects in the background and still stops the camera at the end. A camera that becomes ready after the ride started joins late.
 - Sets the camera's clock to the phone's every time it connects, so the clips and the `.fit` share one time. This changes the camera's real date and time; the app warns if the phone's automatic time is off.
-- Shows speed and distance in miles in the US, UK and the few other countries that use them, and in kilometres elsewhere.
+- Shows speed and distance in miles when the phone's language region is the US, UK or one of the few other countries that use them, and in kilometres elsewhere. "Speed unit" at the bottom of the screen switches it, and the choice is kept.
 - Logs the ride with the screen off: GPS at 1 Hz, motion sensors at about 45 Hz, pressure.
 - Writes the `.fit` with the same record fields as Mimo's own export, on real timestamps, plus developer fields (lean angle, lateral and longitudinal acceleration, camera recording flag) estimated from the GPS track.
 - Controls several Nanos at once ("Choose cameras"). With cameras whose clocks differ, each gets its own `ride-<camera>.fit`.

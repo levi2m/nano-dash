@@ -106,7 +106,10 @@ fun LoggerScreen() {
     var confirmDelete by remember { mutableStateOf<RideSummary?>(null) }
     var showFolded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val unit = SpeedUnit.forCountry(LocalConfiguration.current.locales[0].country)
+    // The unit starts from the language region (miles for US, UK and a few others) but the rider can switch it; the choice is kept.
+    val prefs = remember { context.getSharedPreferences("nanodash", Context.MODE_PRIVATE) }
+    val region = LocalConfiguration.current.locales[0].country
+    var unit by remember { mutableStateOf(SpeedUnit.saved(prefs.getString("speed_unit", null)) ?: SpeedUnit.forCountry(region)) }
     // Location can be switched off, or permission revoked, while the app is in the background, so look again every time it returns.
     var gps by remember { mutableStateOf(GpsReadiness.Ready) }
     LifecycleResumeEffect(Unit) {
@@ -258,6 +261,9 @@ fun LoggerScreen() {
             Column(Modifier.fillMaxWidth().padding(top = Space.s), horizontalAlignment = Alignment.CenterHorizontally) {
                 // The build number is the last part of the release tag (v0.1.0-24), so it can be compared with the releases page.
                 Text("Nano Dash ${BuildConfigInfo.versionName(context)}, build ${BuildConfigInfo.build(context)}", style = NanoText.label, color = c.textMuted)
+                TextButton({ unit = unit.other; prefs.edit().putString("speed_unit", unit.name).apply() }, Modifier.heightIn(min = 48.dp)) {
+                    Text("Speed unit: ${unit.speedLabel} (tap to switch)", style = NanoText.label, color = c.textSecondary)
+                }
                 // Label-sized, so a footer link does not weigh as much as the actions above it; the 48 dp minimum keeps it easy to hit.
                 TextButton(
                     { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
