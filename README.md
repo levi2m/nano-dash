@@ -7,8 +7,6 @@ Ride logger for the DJI Osmo Nano on a motorcycle. It starts and stops the camer
 > [!WARNING]
 > Unofficial. Not affiliated with, endorsed by or sponsored by DJI or Garmin. Not for safety-critical use. Never operate your phone while riding: start the ride before you move off.
 
-<img src="docs/screenshot.jpg" width="280" alt="The Nano Dash main screen, ready to start a ride">
-
 ## What it does
 
 - Finds and pairs the camera, then starts and stops it with the ride. If the link drops it reconnects in the background and still stops the camera at the end. A camera that becomes ready after the ride started joins late.
