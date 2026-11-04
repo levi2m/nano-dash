@@ -471,4 +471,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 internal object BuildConfigInfo {
     fun versionName(context: Context): String =
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "unknown"
+
+    /** The `versionCode`, which CI sets to the run number that is also the end of the release tag. */
+    fun build(context: Context): Long =
+        runCatching { androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(context.packageName, 0)) }.getOrDefault(0L)
 }

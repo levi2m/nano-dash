@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.nanodash.logger.BuildConfigInfo
 import dev.nanodash.logger.CameraController
 import dev.nanodash.logger.CameraUi
 import dev.nanodash.logger.LoggerService
@@ -237,6 +238,19 @@ fun LoggerScreen() {
                         )
                     }
                 }
+            }
+        }
+        item {
+            Column(Modifier.fillMaxWidth().padding(top = Space.s), horizontalAlignment = Alignment.CenterHorizontally) {
+                // The build number is the last part of the release tag (v0.1.0-24), so it can be compared with the releases page.
+                Text("Nano Dash ${BuildConfigInfo.versionName(context)}, build ${BuildConfigInfo.build(context)}", style = NanoText.label, color = c.textMuted)
+                NanoButton(
+                    "Check for updates (opens your browser)",
+                    { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+                    Modifier.fillMaxWidth(),
+                    ButtonKind.Quiet,
+                    height = 48.dp,
+                )
             }
         }
     }
