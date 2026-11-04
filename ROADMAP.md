@@ -7,18 +7,17 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 - Camera control over Bluetooth (pair, wake, set clock, start, stop), with reconnect and several cameras at once, tested against a fake camera and on one real Nano.
 - Timing: first frame, clip end and clock offset measured on a real camera (see [docs/SYNC.md](docs/SYNC.md)).
 - The `.fit` writer: our own encoder, parsed by two independent decoders, imported by Mimo.
-- Three real rides, with the phone locked in a pocket, imported in Mimo and lined up with their clips.
+- Real rides, with the phone locked in a pocket, imported in Mimo and lined up with their clips. A short ride on build 32 (the 360 ms clock offset, rounded seconds and phone-versus-GPS correction) lined up too.
 
 ## Next
 
-1. **Check the new settings on a ride.** The 360 ms offset on the phone's Bluetooth, rounded seconds and the phone-versus-GPS correction are built and unit-tested but not yet seen in Mimo.
-2. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger. The ride list now shows the longest wait between GPS fixes; a gap of minutes means the phone paused the app.
-3. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing.
-4. **Robustness:** done: a missing `.fit` is rebuilt automatically, "Export all rides" (a zip, since rides are removed with the app), `format_version` in `meta.json`. Left: a first-run prompt for battery optimisation on Samsung and similar phones (only if the long ride below shows a need), target API 37, and checks of the light theme, large fonts, TalkBack and landscape.
-5. **Engineering:** done: version catalog, R8 release build (signed once `android/keystore.properties` exists), a GitHub Actions workflow that tests every push and publishes a signed release from `main`, and the testable app logic moved into `core` (80 tests). Left: only if a concrete problem appears, split `LoggerService` or add a ViewModel.
-6. **Publish:** done: public repository, signed release on every push to `main`, rules and security settings. Left: F-Droid. Google Play is probably not happening.
-7. **The merge tool:** combine the camera's own orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`. The camera is rigid on the bike, so it is the better lean source; the GPS estimate stays as the fallback.
-8. **Wear OS companion**, after the phone app is finished: a second GPS source and a start/stop remote, with the phone still holding the camera link.
+1. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger. The ride list now shows the longest wait between GPS fixes; a gap of minutes means the phone paused the app.
+2. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing.
+3. **Robustness:** done: a missing `.fit` is rebuilt automatically, "Export all rides" (a zip, since rides are removed with the app), `format_version` in `meta.json`. Left: a first-run prompt for battery optimisation on Samsung and similar phones (only if the long ride above shows a need), target API 37, and checks of the light theme, large fonts, TalkBack and landscape.
+4. **Engineering:** done: version catalog, R8 release build (signed once `android/keystore.properties` exists), a GitHub Actions workflow that tests every push and publishes a signed release from `main` in a separate job that alone holds the signing key (actions pinned to commit hashes), and the testable app logic moved into `core` (80 tests). Left: only if a concrete problem appears, split `LoggerService` or add a ViewModel.
+5. **Publish:** done: public repository, signed release on every push to `main`, rules and security settings, and two security audits with their fixes. Left: F-Droid. Google Play is probably not happening.
+6. **The merge tool:** combine the camera's own orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`. The camera is rigid on the bike, so it is the better lean source; the GPS estimate stays as the fallback.
+7. **Wear OS companion**, after the phone app is finished: a second GPS source and a start/stop remote, with the phone still holding the camera link.
 
 ## Left out, and why
 

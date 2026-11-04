@@ -25,7 +25,7 @@ Only Mimo draws the overlays, so Mimo is needed once, at the end, to import the 
 
 ## Status
 
-Works on a Samsung Galaxy S25 Ultra with one Osmo Nano: three real rides imported in Mimo and lined up with their clips. Not yet proven on a real ride: the 360 ms clock offset on the phone's Bluetooth, two cameras at once, and rides longer than about ten minutes with the screen off. Other DJI cameras are untested. See [ROADMAP.md](ROADMAP.md).
+Works on a Samsung Galaxy S25 Ultra with one Osmo Nano: real rides imported in Mimo and lined up with their clips, including a short ride on build 32 with the phone locked in a pocket and the screen off, where the 360 ms clock offset, rounded seconds and phone-versus-GPS correction all lined up. Not yet proven on a real ride: two cameras at once, and rides longer than a few minutes with the screen off. Other DJI cameras are untested. See [ROADMAP.md](ROADMAP.md).
 
 ## How to use
 
