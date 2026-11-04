@@ -129,6 +129,8 @@ fun LoggerScreen() {
         }
     }
     LaunchedEffect(ui.recording, ui.message) { reload() }
+    // With quick start on, the Start notification should be there whenever the app is open and no ride is running.
+    LaunchedEffect(ui.recording, ui.saving) { if (!ui.recording && !ui.saving) LoggerService.showReady(context) }
     LaunchedEffect(ui.recording) {
         while (ui.recording) {
             now = System.currentTimeMillis()
@@ -143,6 +145,20 @@ fun LoggerScreen() {
             if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
         }.toTypedArray()
     }
+    var quickStart by remember { mutableStateOf(LoggerService.quickStartEnabled(context)) }
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) { quickStart = true; LoggerService.setQuickStart(context, true) }
+    }
+    fun toggleQuickStart() {
+        val on = !quickStart
+        if (on && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)   // the notification cannot show without it
+            return
+        }
+        quickStart = on
+        LoggerService.setQuickStart(context, on)
+    }
+
     val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) LoggerService.start(context)
         else RideStore.update { it.copy(message = Note("Precise location permission is needed to log a ride.", needsSettings = true)) }
@@ -264,6 +280,10 @@ fun LoggerScreen() {
                 Text("Nano Dash ${BuildConfigInfo.versionName(context)}, build ${BuildConfigInfo.build(context)}", style = NanoText.label, color = c.textMuted)
                 TextButton({ unit = unit.other; prefs.edit().putString("speed_unit", unit.name).apply() }, Modifier.heightIn(min = 48.dp)) {
                     Text("Speed unit: ${unit.speedLabel} (tap to switch)", style = NanoText.label, color = c.textSecondary)
+                }
+                // Off by default: a quiet notification with a Start button, so a watch that mirrors notifications can start a ride.
+                TextButton({ toggleQuickStart() }, Modifier.heightIn(min = 48.dp)) {
+                    Text("Quick start from the watch: ${if (quickStart) "on" else "off"} (tap to switch)", style = NanoText.label, color = c.textSecondary)
                 }
                 // Label-sized, so a footer link does not weigh as much as the actions above it; the 48 dp minimum keeps it easy to hit.
                 TextButton(

@@ -125,7 +125,11 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) stopRide() else startRide()
+        when (intent?.action) {
+            ACTION_STOP -> stopRide()
+            ACTION_START -> startRide()
+            else -> stopSelf()   // nothing else is a command: never start a ride on a stray intent
+        }
         return START_NOT_STICKY
     }
 
@@ -405,6 +409,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         runCatching { locationManager.removeUpdates(this) }
         wakeLock?.let { if (it.isHeld) it.release() }
         session?.let { runCatching { it.close() } }
+        showReady(this)   // with quick start on, the Start button comes back once the ride is over
         super.onDestroy()
     }
 
@@ -456,6 +461,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             .setContentTitle("Nano Dash Logger")
             .setContentText(text)
             .setOngoing(true)
+            .setLocalOnly(false)   // a Wear OS watch mirrors this notification with its Stop button
             .setContentIntent(open)
             .addAction(0, "Stop", stop)
             .build()
@@ -479,6 +485,45 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 
         fun stop(context: Context) {
             context.startService(Intent(context, LoggerService::class.java).setAction(ACTION_STOP))
+        }
+
+        // ----- quick start: a quiet notification with a Start button, so a watch that mirrors notifications can start a ride -----
+        private const val READY_CHANNEL_ID = "ready"
+
+        private fun prefs(context: Context) = context.getSharedPreferences("nanodash", Context.MODE_PRIVATE)
+
+        fun quickStartEnabled(context: Context): Boolean = prefs(context).getBoolean("quick_start", false)
+
+        /** Off by default: while it is on, a "Start ride" notification stays on the phone whenever no ride is running. */
+        fun setQuickStart(context: Context, on: Boolean) {
+            prefs(context).edit().putBoolean("quick_start", on).apply()
+            if (on) showReady(context) else (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(NOTIFICATION_ID)
+        }
+
+        fun showReady(context: Context) {
+            if (!quickStartEnabled(context)) return
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (nm.getNotificationChannel(READY_CHANNEL_ID) == null) {
+                nm.createNotificationChannel(NotificationChannel(READY_CHANNEL_ID, "Quick start", NotificationManager.IMPORTANCE_LOW))
+            }
+            val open = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+            val start = PendingIntent.getForegroundService(
+                context, 2, Intent(context, LoggerService::class.java).setAction(ACTION_START), PendingIntent.FLAG_IMMUTABLE,
+            )
+            // Same id as the ride notification, so starting a ride replaces this one in place.
+            nm.notify(
+                NOTIFICATION_ID,
+                NotificationCompat.Builder(context, READY_CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                    .setContentTitle("Nano Dash is ready")
+                    .setContentText("Start a ride here or from your watch")
+                    .setOngoing(true)
+                    .setSilent(true)
+                    .setLocalOnly(false)
+                    .setContentIntent(open)
+                    .addAction(0, "Start ride", start)
+                    .build(),
+            )
         }
     }
 }
