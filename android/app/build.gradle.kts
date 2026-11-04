@@ -11,12 +11,12 @@ val keystoreProps = rootProject.file("keystore.properties").takeIf { it.exists()
 
 android {
     namespace = "dev.nanodash.logger"
-    compileSdk = 37          // current AndroidX libraries require 37; targetSdk stays 36 below
+    compileSdk = 37          // current AndroidX libraries require 37
 
     defaultConfig {
         applicationId = "io.github.levi2m.nanodash"   // fixed once published; the Kotlin namespace above is separate and can stay
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1   // CI passes its run number so every release is newer
         versionName = "0.1.0"
     }
