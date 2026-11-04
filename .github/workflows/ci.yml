@@ -2,6 +2,7 @@ name: ci
 
 on:
   push:
+    branches: [main]   # pull requests are checked by the pull_request trigger
     paths: [android/**, .github/workflows/**]   # docs-only pushes need no build or release
   pull_request:
 
