@@ -63,6 +63,19 @@ class RideFolderTest {
     }
 
     @Test
+    fun reportsTheLongestWaitBetweenFixesAndKeepsItInTheCache() {
+        val dir = ride("ride-4", 10, finished = true)
+        val seconds = (0 until 10).map { if (it < 5) it else it + 89 }          // a 90 s hole after the fifth fix
+        File(dir, "gnss.csv").writeText(header + seconds.joinToString("\n") { "${it}000000000,${t0 + it * 1000L},-20.2,-40.2,5.0,8.0,0.0,3.0,0.5,2.0,4.0" } + "\n")
+        assertEquals(90L, RideFolder.summarize(dir).longestGapSeconds)
+        File(dir, "gnss.csv").delete()
+        assertEquals(90L, RideFolder.summarize(dir).longestGapSeconds)           // read back from route.txt
+        File(dir, "route.txt").writeText("-20.2,-40.2\n-20.3,-40.2")             // a cache written before the gap was kept
+        assertNull(RideFolder.summarize(dir).longestGapSeconds)
+        assertEquals(0L, RideFolder.longestGapSeconds(emptyList()))
+    }
+
+    @Test
     fun rebuildWritesOneFileOrOnePerClockAndReplacesOldOnes() {
         val one = ride("ride-1", 30, finished = true,
             events = """{"event":"camera_stop","camera":"Osmo Nano AA:1A:2B","fit_shift_ms":-360,"clip_span_estimate_utc_ms":[${t0 + 2000},${t0 + 20000}]}""")
@@ -78,6 +91,17 @@ class RideFolderTest {
         assertEquals(listOf("ride-1A2B.fit", "ride-77D4.fit"), RideFolder.fitFiles(two).map { it.name })
         assertEquals(2, assertNotNull(RideFolder.summarize(two)).fits.size)
         assertTrue(RideFolder.summarize(two).files.map { it.name }.containsAll(listOf("ride-1A2B.fit", "ride-77D4.fit", "gnss.csv", "meta.json")))
+    }
+
+    @Test
+    fun zipAllPacksEveryRidesFilesUnderItsFolderName() {
+        ride("ride-a", 5, finished = true, events = "{}")
+        ride("ride-b", 5, finished = true)
+        RideFolder.summarize(File(root, "ride-a"))                     // leaves route.txt, which is only a cache
+        val zip = File(root, "all.zip")
+        assertEquals(2, RideFolder.zipAll(root, zip))
+        val names = java.util.zip.ZipFile(zip).use { z -> z.entries().toList().map { it.name } }
+        assertEquals(listOf("ride-a/events.jsonl", "ride-a/gnss.csv", "ride-a/meta.json", "ride-b/gnss.csv", "ride-b/meta.json"), names.sorted())
     }
 
     @Test

@@ -32,7 +32,7 @@ Works on a Samsung Galaxy S25 Ultra with one Osmo Nano: three real rides importe
 4. Tap Stop ride (or Stop in the notification) when you arrive, and wait for "Saved".
 5. Tap Share .fit on the ride, and in Mimo import the `.fit` together with the clip.
 
-Rides live in the app's private storage and are deleted with the app, so share the ones you want to keep.
+Rides live in the app's private storage and are deleted with the app, so share the ones you want to keep, or tap "Export all rides" for one zip of everything.
 
 ## Build
 

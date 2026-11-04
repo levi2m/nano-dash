@@ -12,9 +12,9 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 ## Next
 
 1. **Check the new settings on a ride.** The 360 ms offset on the phone's Bluetooth, rounded seconds and the phone-versus-GPS correction are built and unit-tested but not yet seen in Mimo.
-2. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger.
+2. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger. The ride list now shows the longest wait between GPS fixes; a gap of minutes means the phone paused the app.
 3. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing.
-4. **Robustness:** rebuild a missing `.fit` automatically on launch, a first-run prompt for battery optimisation on Samsung and similar phones, an "export all rides" action (rides are removed with the app), `format_version` in `meta.json`, target API 37, and checks of the light theme, large fonts, TalkBack and landscape.
+4. **Robustness:** done: a missing `.fit` is rebuilt automatically, "Export all rides" (a zip, since rides are removed with the app), `format_version` in `meta.json`. Left: a first-run prompt for battery optimisation on Samsung and similar phones (only if the long ride below shows a need), target API 37, and checks of the light theme, large fonts, TalkBack and landscape.
 5. **Engineering:** done: version catalog, R8 release build (signed once `android/keystore.properties` exists), a GitHub Actions workflow that tests every push and publishes a signed release from `main`, and the testable app logic moved into `core` (80 tests). Left: only if a concrete problem appears, split `LoggerService` or add a ViewModel.
 6. **Publish:** done: public repository, signed release on every push to `main`, rules and security settings. Left: F-Droid. Google Play is probably not happening.
 7. **The merge tool:** combine the camera's own orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`. The camera is rigid on the bike, so it is the better lean source; the GPS estimate stays as the fallback.

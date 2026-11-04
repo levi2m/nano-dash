@@ -403,6 +403,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             },
         )
         val json = JSONObject()
+            .put("format_version", 1)   // raise when a field changes meaning, so a reader can tell old rides from new
             .put("app", packageName + " " + BuildConfigInfo.versionName(this))
             .put("altitude_reference", if (Build.VERSION.SDK_INT >= 34) "msl" else "wgs84_ellipsoid")
             .put("device", Build.MANUFACTURER + " " + Build.MODEL)

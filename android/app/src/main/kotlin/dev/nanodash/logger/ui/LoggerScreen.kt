@@ -99,7 +99,15 @@ fun LoggerScreen() {
     var showFolded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    suspend fun reload() { rides = withContext(Dispatchers.IO) { RideFiles.list(context) } }
+    suspend fun reload() {
+        rides = withContext(Dispatchers.IO) {
+            val all = RideFiles.list(context)
+            // A ride cut off before its .fit was written is rebuilt from its GPS log, but never while a ride is recording or being saved.
+            val missing = if (ui.recording || ui.saving) emptyList() else all.filter { !it.hasFit && it.fixes > 0 }
+            missing.forEach { runCatching { RideFolder.rebuildFit(it.dir) } }
+            if (missing.isEmpty()) all else RideFiles.list(context)
+        }
+    }
     LaunchedEffect(ui.recording, ui.message) { reload() }
     LaunchedEffect(ui.recording) {
         while (ui.recording) {
@@ -192,6 +200,23 @@ fun LoggerScreen() {
                         onRebuild = { scope.launch { withContext(Dispatchers.IO) { RideFolder.rebuildFit(ride.dir) }; reload() } },
                         onDelete = { confirmDelete = ride },
                     )
+                }
+                if (!ui.recording) {
+                    item {
+                        NanoButton(
+                            "Export all rides (${list.size})",
+                            {
+                                scope.launch {
+                                    val zip = java.io.File(RideFiles.root(context), "nano-dash-rides.zip")
+                                    withContext(Dispatchers.IO) { RideFolder.zipAll(RideFiles.root(context), zip) }
+                                    share(context, listOf(zip))
+                                }
+                            },
+                            Modifier.fillMaxWidth(),
+                            ButtonKind.Secondary,
+                            height = 48.dp,
+                        )
+                    }
                 }
                 if (folded.isNotEmpty()) {
                     item {
@@ -453,6 +478,8 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, onShareFit: () -> Un
         }
         Column {
             Fact("GPS fixes", ride.fixes.toString())
+            // GPS is logged once a second, so a long wait means a tunnel or the phone pausing the app; 10 s keeps ordinary hiccups out.
+            ride.longestGapSeconds?.takeIf { it >= 10 }?.let { Fact("Longest GPS gap", clock(it)) }
             ride.cameraClipSeconds.forEachIndexed { i, s ->
                 Fact(if (ride.cameraClipSeconds.size == 1) "Camera clip" else "Camera ${i + 1} clip", "%.1f s".format(s))
             }
