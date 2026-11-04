@@ -1,4 +1,5 @@
 name: Bug report
+labels: [bug]
 description: Something did not work on a ride or with the camera
 body:
   - type: input

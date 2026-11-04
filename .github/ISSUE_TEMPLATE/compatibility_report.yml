@@ -1,0 +1,25 @@
+name: Works on my phone or camera
+description: Report how Nano Dash behaved on your phone and camera, good or bad
+labels: [compatibility]
+body:
+  - type: input
+    id: phone
+    attributes: { label: Phone and Android version, placeholder: Samsung Galaxy S25 Ultra, Android 16 }
+    validations: { required: true }
+  - type: input
+    id: camera
+    attributes: { label: Camera and firmware version, placeholder: Osmo Nano, v01.00.0000 }
+    validations: { required: true }
+  - type: input
+    id: app
+    attributes: { label: App version (release tag), placeholder: v0.1.0-21 }
+    validations: { required: true }
+  - type: dropdown
+    id: lined_up
+    attributes:
+      label: Did the .fit line up with the clip in Mimo?
+      options: [Yes, exactly, Close (under a second off), Off by about a second or more, Not tried yet]
+    validations: { required: true }
+  - type: textarea
+    id: notes
+    attributes: { label: Notes, description: "Ride length, screen off or on, more than one camera. Attach meta.json and events.jsonl from the ride folder if you can; leave out gnss.csv if you do not want to share your route." }
