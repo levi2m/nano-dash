@@ -1,0 +1,41 @@
+# Draft F-Droid build recipe for Nano Dash. It is NOT used by this repository's own build; it is the file to copy into
+# the F-Droid data repository (https://gitlab.com/fdroid/fdroiddata, as metadata/io.github.levi2m.nanodash.yml) when
+# opening the merge request. It has not been run through `fdroid build` yet: see docs/FDROID.md for how to test it.
+# The name, summary, description and screenshots come from fastlane/metadata/android/en-US in this repository.
+
+Categories:
+  - Sports & Health
+License: Apache-2.0
+AuthorName: levi2m
+WebSite: https://github.com/levi2m/nano-dash
+SourceCode: https://github.com/levi2m/nano-dash
+IssueTracker: https://github.com/levi2m/nano-dash/issues
+Changelog: https://github.com/levi2m/nano-dash/releases
+
+AutoName: Nano Dash
+
+RepoType: git
+Repo: https://github.com/levi2m/nano-dash.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 35
+    commit: v0.1.0-35
+    subdir: android/app
+    # The project is built with JDK 21 (see android/core/build.gradle.kts); the build server may have an older one.
+    sudo:
+      - apt-get update
+      - apt-get install -y openjdk-21-jdk-headless
+      - update-alternatives --auto java
+    gradle:
+      - yes
+    # CI passes the build number as -PversionCode, so the recipe has to as well, or the APK would say 1.
+    gradleprops:
+      - versionCode=35
+
+# One entry per release that should reach F-Droid. Every push to main makes a GitHub release, so tags are not an update
+# signal here; add an entry by hand (or pick a separate tag pattern) when a build is worth shipping.
+AutoUpdateMode: None
+UpdateCheckMode: None
+CurrentVersion: 0.1.0
+CurrentVersionCode: 35

@@ -1,0 +1,18 @@
+Nano Dash is a ride logger for the DJI Osmo Nano motorcycle camera. It starts and stops the camera over Bluetooth with your ride, logs GPS and motion on the phone, and writes a .fit file that DJI Mimo can attach to the footage as speed, route and elevation overlays. The phone can stay locked in your pocket.
+
+<b>What it does</b>
+<ul>
+<li>Finds and pairs the camera, then starts and stops it with the ride. If the link drops it reconnects in the background.</li>
+<li>Sets the camera's clock to the phone's every time it connects, so the clips and the .fit share one time.</li>
+<li>Logs the ride with the screen off: GPS at 1 Hz, motion sensors and pressure.</li>
+<li>Writes a Mimo-importable .fit file with speed, route, elevation and estimated lean angle.</li>
+<li>Controls several Nanos at once.</li>
+<li>Opens a ride's route in a maps app of your choice as GPX.</li>
+<li>Shows speed and distance in km or miles; you pick.</li>
+</ul>
+
+<b>Private by design</b>
+The app has no internet permission. Rides stay on your phone and leave only when you tap Share. There is no account, no analytics and no crash reporting. Backups and device transfers are switched off for the app.
+
+<b>Good to know</b>
+DJI Mimo is needed once, at the end, to import the .fit file together with the clip. The app is unofficial and is not affiliated with, endorsed by or sponsored by DJI or Garmin. It is not for safety-critical use, and you should never operate your phone while riding: start the ride before you move off. It has been tested on one Osmo Nano and one Samsung phone, so other phones and cameras are welcome as compatibility reports on the project page.

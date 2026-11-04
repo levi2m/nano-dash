@@ -1,0 +1,1 @@
+Ride logger for the DJI Osmo Nano: starts the camera, logs GPS, writes a .fit
