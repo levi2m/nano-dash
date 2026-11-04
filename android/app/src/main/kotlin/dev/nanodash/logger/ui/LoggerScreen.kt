@@ -34,6 +34,17 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -151,6 +162,7 @@ fun LoggerScreen() {
     var watchName by remember { mutableStateOf(LoggerService.watchName(context)) }
     var chooseWatch by remember { mutableStateOf(false) }
     var watchGuide by remember { mutableStateOf(false) }
+    var settings by remember { mutableStateOf(false) }
     // Quick start needs location (the service type), Bluetooth (the watch link) and notifications (the Start button).
     val quickStartPermissions = remember {
         buildList {
@@ -205,7 +217,7 @@ fun LoggerScreen() {
         contentPadding = PaddingValues(horizontal = Space.l, vertical = Space.l),
         verticalArrangement = Arrangement.spacedBy(Space.l),
     ) {
-        item { Header() }
+        item { Header { settings = true } }
         item { RidePanel(ui, cam, now, gps, unit) }
         item {
             ActionArea(
@@ -295,32 +307,66 @@ fun LoggerScreen() {
             Column(Modifier.fillMaxWidth().padding(top = Space.s), horizontalAlignment = Alignment.CenterHorizontally) {
                 // The build number is the last part of the release tag (v0.1.0-24), so it can be compared with the releases page.
                 Text("Nano Dash ${BuildConfigInfo.versionName(context)}, build ${BuildConfigInfo.build(context)}", style = NanoText.label, color = c.textMuted)
-                TextButton({ unit = unit.other; prefs.edit().putString("speed_unit", unit.name).apply() }, Modifier.heightIn(min = 48.dp)) {
-                    Text("Speed unit: ${unit.speedLabel} (tap to switch)", style = NanoText.label, color = c.textSecondary)
-                }
-                // Off by default: a quiet notification with a Start button, so a watch that mirrors notifications can start a ride.
-                TextButton({ toggleQuickStart() }, Modifier.heightIn(min = 48.dp)) {
-                    Text("Quick start from the watch: ${if (quickStart) "on" else "off"} (tap to switch)", style = NanoText.label, color = c.textSecondary)
-                }
-                if (quickStart) {
-                    TextButton({ chooseWatch = true }, Modifier.heightIn(min = 48.dp)) {
-                        Text("Watch: ${watchName ?: "none chosen"} (tap to choose)", style = NanoText.label, color = c.textSecondary)
-                    }
-                    val seen = remember { LoggerService.watchSeen(context) } > 0
-                    TextButton({ watchGuide = true }, Modifier.heightIn(min = 48.dp)) {
-                        Text(
-                            "Watch app: ${if (seen) "connected before" else "not seen yet"} (tap for setup)",
-                            style = NanoText.label, color = c.textSecondary,
-                        )
-                    }
-                }
-                // Label-sized, so a footer link does not weigh as much as the actions above it; the 48 dp minimum keeps it easy to hit.
-                TextButton(
-                    { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
-                    Modifier.heightIn(min = 48.dp),
-                ) { Text("Check for updates (opens your browser)", style = NanoText.label, color = c.textSecondary) }
+                // The link is underlined as well as coloured, so it does not rely on colour alone.
+                val link = SpanStyle(color = c.accentText, textDecoration = TextDecoration.Underline)
+                Text(
+                    buildAnnotatedString {
+                        append("Built by ")
+                        withLink(LinkAnnotation.Url("https://github.com/levi2m", TextLinkStyles(link))) { append("levi2m") }
+                        append(" and his AI agents")
+                    },
+                    style = NanoText.label, color = c.textMuted, textAlign = TextAlign.Center,
+                )
             }
         }
+    }
+
+    if (settings) {
+        AlertDialog(
+            onDismissRequest = { settings = false },
+            containerColor = c.card,
+            title = { Text("Settings", style = NanoText.heading, color = c.text, modifier = Modifier.semantics { heading() }) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    SectionLabel("Units")
+                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Speed", style = NanoText.body, color = c.text)
+                        Row(Modifier.clip(RoundedCornerShape(Radius.control)).background(c.bg)) {
+                            SpeedUnit.entries.forEach { option ->
+                                val selected = option == unit
+                                Box(
+                                    Modifier.heightIn(min = 48.dp).clickable(role = Role.RadioButton) { unit = option; prefs.edit().putString("speed_unit", option.name).apply() }
+                                        .semantics { this.selected = selected }
+                                        .background(if (selected) c.accent else c.bg).padding(horizontal = Space.m),
+                                    contentAlignment = Alignment.Center,
+                                ) { Text(option.speedLabel, style = NanoText.label, color = if (selected) c.onAccent else c.textSecondary) }
+                            }
+                        }
+                    }
+                    SectionLabel("Watch remote", Modifier.padding(top = Space.m))
+                    // Off by default: a quiet notification with a Start button, so a watch can start a ride.
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(quickStart, role = Role.Switch) { toggleQuickStart() },
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.m),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Quick start from the watch", style = NanoText.body, color = c.text)
+                            Text("Adds one quiet notification", style = NanoText.label, color = c.textMuted)
+                        }
+                        Switch(quickStart, null, colors = SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
+                    }
+                    if (quickStart) {
+                        SettingRow("Watch", watchName ?: "None chosen") { chooseWatch = true }
+                        SettingRow("Watch app", if (LoggerService.watchSeen(context) > 0) "Connected before" else "Not seen yet") { watchGuide = true }
+                    }
+                    SectionLabel("About", Modifier.padding(top = Space.m))
+                    SettingRow("Check for updates", "Opens your browser") {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { settings = false }) { Text("Done", style = NanoText.button, color = c.text) } },
+        )
     }
 
     if (watchGuide) {
@@ -390,13 +436,26 @@ fun LoggerScreen() {
 }
 
 @Composable
-private fun Header() {
-    Row(Modifier.padding(top = Space.s), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.m)) {
+private fun Header(onSettings: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = Space.s), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.m)) {
         RouteMark(Modifier.size(40.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             Text("Nano Dash", style = NanoText.title, color = nanoColors.text)
             Text("Ride logger for the Osmo Nano", style = NanoText.label, color = nanoColors.textMuted)
         }
+        TextButton(onSettings, Modifier.heightIn(min = 48.dp)) { Text("Settings", style = NanoText.button, color = nanoColors.text) }
+    }
+}
+
+/** A tappable settings row: the name on the left, its current value on the right. */
+@Composable
+private fun SettingRow(title: String, value: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(title, style = NanoText.body, color = nanoColors.text)
+        Text(value, style = NanoText.label, color = nanoColors.textSecondary)
     }
 }
 
