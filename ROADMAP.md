@@ -15,7 +15,7 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 
 1. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger. The ride list now shows the longest wait between GPS fixes; a gap of minutes means the phone paused the app.
 2. **F-Droid**, in progress: F-Droid builds from source and signs with its own key, so a GitHub APK and an F-Droid APK cannot update over each other. Needs its metadata file and a clean build check. Google Play is probably not happening.
-3. **Wear OS companion, first version:** a start/stop remote on the watch, with the phone still holding the camera link. A second GPS source from the watch comes later, if at all.
+3. **Wear OS remote:** design in [docs/WEAR_OS.md](docs/WEAR_OS.md). First a spike on the real watch to see whether the existing Stop notification action already mirrors; a watch app only if it does not.
 4. **The merge tool**, undecided: first check on a ride whether Mimo's lean and G widgets already work from the clip's own sensors. If they do, drop it. If not, combine the camera's orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`, keeping the GPS estimate as the fallback.
 5. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing. Waits for someone with two Nanos to file a compatibility report.
 6. **Robustness, what is left:** a first-run battery-optimisation prompt, only if the long ride shows a need.
