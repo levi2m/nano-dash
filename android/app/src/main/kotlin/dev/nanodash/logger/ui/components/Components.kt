@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -90,14 +91,22 @@ fun StatusRow(label: String, value: String, health: Health, modifier: Modifier =
         // One easing curve for the whole app; the light changes colour over 160 ms instead of snapping.
         val light by animateColorAsState(health.color(), tween(160, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)), label = "status light")
         Box(Modifier.size(12.dp).clip(CircleShape).background(light))
-        Text(label, Modifier.padding(start = Space.m), style = NanoText.body, color = nanoColors.textSecondary)
-        Text(
-            value,
-            Modifier.weight(1f).padding(start = Space.m),
-            style = NanoText.bodyNumbers,
-            color = nanoColors.text,
-            textAlign = TextAlign.End,
-        )
+        if (LocalDensity.current.fontScale > 1.3f) {
+            // Side by side, large text leaves the value one word per line, so the value goes under its label instead.
+            Column(Modifier.weight(1f).padding(start = Space.m, top = Space.xs, bottom = Space.xs)) {
+                Text(label, style = NanoText.body, color = nanoColors.textSecondary)
+                Text(value, style = NanoText.bodyNumbers, color = nanoColors.text)
+            }
+        } else {
+            Text(label, Modifier.padding(start = Space.m), style = NanoText.body, color = nanoColors.textSecondary)
+            Text(
+                value,
+                Modifier.weight(1f).padding(start = Space.m),
+                style = NanoText.bodyNumbers,
+                color = nanoColors.text,
+                textAlign = TextAlign.End,
+            )
+        }
     }
 }
 
