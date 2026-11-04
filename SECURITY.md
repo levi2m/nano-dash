@@ -8,6 +8,7 @@ Please report security problems privately through GitHub's "Report a vulnerabili
 
 - The Osmo Nano's Bluetooth control link is unencrypted by DJI's design and the pairing identifier travels in the clear. A nearby device that overhears it could control the camera. Nano Dash cannot fix this; it is the camera's protocol.
 - Debug builds are signed with a debug key and are for testing only.
+- Rides are kept in the app's external files folder, not in private internal storage, so they can be reached over USB when troubleshooting. On Android 10 and older, another app with storage permission can read them; on Android 11 and later it cannot. Accepted for now, and it may move to private storage later.
 
 ## Hardening in the app
 

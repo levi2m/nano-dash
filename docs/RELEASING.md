@@ -1,6 +1,6 @@
 # Releasing
 
-**Automatic:** once the three secrets below exist, every push to `main` that changes `android/` or the workflow and passes CI publishes a signed release `v<versionName>-<run number>` (the run number is also the `versionCode`). Add them in the repository's Settings → Secrets and variables → Actions, or with `gh secret set`:
+**Automatic:** once the three secrets below exist, every push to `main` that changes `android/` or the workflow and passes the tests publishes, from a separate `release` job that alone holds the signing secrets and a write token, a signed release `v<versionName>-<run number>` (the run number is also the `versionCode`). Add them in the repository's Settings → Secrets and variables → Actions, or with `gh secret set`:
 
 - `KEYSTORE_B64`: the keystore from step 1, as base64 (`base64 -w0 nano-dash-release.jks`)
 - `KEYSTORE_PASSWORD` and `KEY_PASSWORD`: its passwords (the key alias must be `nanodash`)
