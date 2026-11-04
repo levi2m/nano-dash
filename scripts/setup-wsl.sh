@@ -91,8 +91,10 @@ echo "== rea jadx jar"
   d="$HOME/.local/share/rea/android"; mkdir -p "$d"; cd "$d"
   want='6e5eacf500b64292bfb73c49797c1958f6ee44646e43e868039ae7feb573ff75'
   if ! echo "${want}  jadx-headless-mcp-0.7.1-all.jar" | sha256sum -c - >/dev/null 2>&1; then
-    curl -fL -o jadx-headless-mcp-0.7.1-all.jar https://github.com/1013503897/jadx-headless-mcp/releases/download/v0.7.1/jadx-headless-mcp-0.7.1-all.jar
-    echo "${want}  jadx-headless-mcp-0.7.1-all.jar" | sha256sum -c -
+    tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
+    curl -fL -o "$tmp" https://github.com/1013503897/jadx-headless-mcp/releases/download/v0.7.1/jadx-headless-mcp-0.7.1-all.jar
+    echo "${want}  $tmp" | sha256sum -c -   # verified before it gets its final name
+    mv "$tmp" jadx-headless-mcp-0.7.1-all.jar
   fi
 ) && ok jadx-jar "$HOME/.local/share/rea/android/jadx-headless-mcp-0.7.1-all.jar" || fail jadx-jar "see output above"
 

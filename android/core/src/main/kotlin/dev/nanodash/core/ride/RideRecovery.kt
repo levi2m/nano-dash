@@ -24,7 +24,7 @@ object RideRecovery {
 
     /** Every camera clip's phone-time window recorded in `events.jsonl` when a camera was stopped; one per camera. */
     fun clipSpansFromEvents(eventsJsonl: String?): List<CameraSpan> =
-        eventsJsonl?.let { text -> SPAN.findAll(text).map { CameraSpan(it.groupValues[1].toLong(), it.groupValues[2].toLong()) }.toList() }
+        eventsJsonl?.let { text -> SPAN.findAll(text).mapNotNull { m -> val a = m.groupValues[1].toLongOrNull(); val b = m.groupValues[2].toLongOrNull(); if (a != null && b != null) CameraSpan(a, b) else null }.toList() }
             ?: emptyList()
 
     /** One camera's clip window and how far its clock sits from the phone's, as logged when it was stopped. */
@@ -46,11 +46,13 @@ object RideRecovery {
     fun clipsFromEvents(eventsJsonl: String?): List<CameraClip> =
         eventsJsonl?.lineSequence().orEmpty().mapNotNull { line ->
             val span = SPAN.find(line) ?: return@mapNotNull null
+            val start = span.groupValues[1].toLongOrNull() ?: return@mapNotNull null    // digits too long for a Long: skip the line
+            val end = span.groupValues[2].toLongOrNull() ?: return@mapNotNull null
             CameraClip(
                 CAMERA.find(line)?.groupValues?.get(1) ?: "",
-                CameraSpan(span.groupValues[1].toLong(), span.groupValues[2].toLong()),
-                SHIFT.find(line)?.groupValues?.get(1)?.toLong() ?: CameraTiming.LEGACY_FIT_SHIFT_MS,
-                SKEW.find(line)?.groupValues?.get(1)?.toLong() ?: 0,
+                CameraSpan(start, end),
+                SHIFT.find(line)?.groupValues?.get(1)?.toLongOrNull() ?: CameraTiming.LEGACY_FIT_SHIFT_MS,
+                SKEW.find(line)?.groupValues?.get(1)?.toLongOrNull() ?: 0,
             )
         }.toList()
 

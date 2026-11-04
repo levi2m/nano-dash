@@ -11,6 +11,7 @@ def mvhd(path):
             sz, typ = struct.unpack('>I4s', h[:8]); hdr = 8
             if sz == 1: sz = struct.unpack('>Q', h[8:16])[0]; hdr = 16
             elif sz == 0: sz = size - pos
+            if sz < hdr: break   # a zero 64-bit size would never advance
             boxes.append((typ.decode('latin1'), pos, sz))
             if typ == b'moov':
                 f.seek(pos + hdr); body = f.read(120)

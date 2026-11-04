@@ -118,6 +118,22 @@ class RideFolderTest {
     }
 
     @Test
+    fun aHostileMetaOrEventsFileCannotMakeASummaryThrow() {
+        val dir = ride("ride-8", 3, finished = true)
+        File(dir, "meta.json").writeText("""{"start_utc_ms":99999999999999999999999,"end_utc_ms":-1,"gnss_fixes":99999999999}""")
+        File(dir, "events.jsonl").writeText("""{"event":"camera_stop","clip_span_estimate_utc_ms":[99999999999999999999999,5]}""")
+        assertEquals(emptyList(), RideFolder.summarize(dir).cameraClipSeconds)      // digits too long for a Long are skipped, not thrown
+    }
+
+    @Test
+    fun writeAtomicallyReplacesAFileAndLeavesNoTemporaryOne() {
+        val f = File(root, "meta.json").apply { writeText("old") }
+        RideFolder.writeAtomically(f, "new".toByteArray())
+        assertEquals("new", f.readText())
+        assertFalse(File(root, "meta.json.tmp").exists())
+    }
+
+    @Test
     fun zipAllPacksEveryRidesFilesUnderItsFolderName() {
         ride("ride-a", 5, finished = true, events = "{}")
         ride("ride-b", 5, finished = true)

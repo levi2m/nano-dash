@@ -223,6 +223,8 @@ async def duml_session(address: str, record: bool, record_seconds: float):
             ident = secrets.token_hex(16)
             idfile.parent.mkdir(parents=True, exist_ok=True)
             idfile.write_text(ident)
+            try: idfile.chmod(0o600)  # owner only: it is the credential that identifies this PC to the camera
+            except OSError: pass
         note(f"controller identifier: {ident[:4]}... (stored in {idfile})")
         print("\n>>> WATCH THE CAMERA SCREEN: approve the new controller if asked. <<<\n")
         await send(SESSION_F0, 0x00, 0x2B, bytes([0x04, 0x00]), "pre-pair 00/2B")

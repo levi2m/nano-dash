@@ -37,6 +37,7 @@ import dev.nanodash.core.camera.cameraLabel
 import dev.nanodash.core.fit.CameraSpan
 import dev.nanodash.core.ride.ClockSkew
 import dev.nanodash.core.ride.GnssFix
+import dev.nanodash.core.ride.RideFolder
 import dev.nanodash.core.ride.RideRecovery
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -83,7 +84,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         val gnss = BufferedWriter(FileWriter(File(dir, "gnss.csv")), 1 shl 16)
         val imu = BufferedWriter(FileWriter(File(dir, "imu.csv")), 1 shl 17)
         val events = BufferedWriter(FileWriter(File(dir, "events.jsonl")))
-        val fixes = ArrayList<GnssFix>()
+        val fixes = java.util.concurrent.CopyOnWriteArrayList<GnssFix>()   // the finisher thread reads it while the logger thread may still add a last fix
         val imuCounts = HashMap<Int, Long>()
         var imuTotal = 0L
         val line = StringBuilder(96)
@@ -139,7 +140,13 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         if (Build.VERSION.SDK_INT < 31 || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
             types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         }
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification("Starting"), types)
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification("Starting"), types)
+        } catch (e: SecurityException) {   // Android 14 and later refuse the location type without the permission
+            RideStore.update { it.copy(message = Note("Location permission is missing.", needsSettings = true)) }
+            stopSelf()
+            return
+        }
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             RideStore.update { it.copy(message = Note("Location permission is missing.", needsSettings = true)) }
@@ -158,7 +165,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         val startElapsed = SystemClock.elapsedRealtimeNanos()
         val root = getExternalFilesDir("rides") ?: File(filesDir, "rides")
         val dir = File(root, "ride-" + stamp(startUtc)).apply { mkdirs() }
-        val s = Session(dir, startUtc, startElapsed)
+        val s = try {
+            Session(dir, startUtc, startElapsed)
+        } catch (e: IOException) {
+            RideStore.update { it.copy(message = Note("Could not create the ride files: ${e.message}")) }
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return
+        }
         session = s
         writeMeta(s, endUtc = null, fitWritten = false, samples = 0, spans = emptyMap())
 
@@ -237,7 +251,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun stopRide() {
         val s = session
         if (s == null) {
-            stopSelf()
+            if (!saving) stopSelf()   // a Stop during saving must not switch the service off under the writer
             return
         }
         session = null
@@ -311,7 +325,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             if (built == null) {
                 message = Note("No GPS fixes were received, so no .fit was written. Motion data was saved.")
             } else {
-                built.forEach { File(s.dir, it.fileName).writeBytes(it.bytes) }
+                built.forEach { RideFolder.writeAtomically(File(s.dir, it.fileName), it.bytes) }
                 samples = built.first().samples
                 written = true
                 message = Note(if (built.size == 1) "Saved ${samples} s of ride to ride.fit" else "Saved ${samples} s of ride, one .fit for each camera's clock", problem = false)
@@ -419,7 +433,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             .put("cameras", cameras)
             .put("fit_written", fitWritten)
             .put("fit_samples", samples)
-        File(s.dir, "meta.json").writeText(json.toString(2))
+        RideFolder.writeAtomically(File(s.dir, "meta.json"), json.toString(2).toByteArray())
     }
 
     private fun stamp(utcMillis: Long): String =

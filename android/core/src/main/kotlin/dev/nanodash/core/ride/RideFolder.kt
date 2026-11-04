@@ -45,9 +45,9 @@ object RideFolder {
 
     fun summarize(dir: File): RideSummary {
         val meta = File(dir, "meta.json").takeIf { it.exists() }?.readText().orEmpty()
-        val start = START.find(meta)?.groupValues?.get(1)?.toLong() ?: 0L
-        val end = END.find(meta)?.groupValues?.get(1)?.toLong()          // null while recording and for a ride that was cut off
-        val track = trackOf(dir, finished = end != null, metaFixes = FIXES.find(meta)?.groupValues?.get(1)?.toInt())
+        val start = START.find(meta)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+        val end = END.find(meta)?.groupValues?.get(1)?.toLongOrNull()        // null while recording and for a ride that was cut off
+        val track = trackOf(dir, finished = end != null, metaFixes = FIXES.find(meta)?.groupValues?.get(1)?.toIntOrNull())
 
         val clips = RideRecovery.clipSpansFromEvents(File(dir, "events.jsonl").takeIf { it.exists() }?.readText())
             .map { (it.endUtcMillis - it.startUtcMillis) / 1000.0 }
@@ -115,9 +115,20 @@ object RideFolder {
         val gnss = File(dir, "gnss.csv").takeIf { it.exists() } ?: return false
         val events = File(dir, "events.jsonl").takeIf { it.exists() }?.readText()
         val fits = RideRecovery.rebuildFits(gnss.readText(), events) ?: return false
-        fitFiles(dir).forEach { it.delete() }
-        fits.forEach { File(dir, it.fileName).writeBytes(it.bytes) }
+        val keep = fits.map { it.fileName }.toSet()
+        fits.forEach { writeAtomically(File(dir, it.fileName), it.bytes) }
+        fitFiles(dir).filter { it.name !in keep }.forEach { it.delete() }   // old files go only after the new ones are in place
         return true
+    }
+
+    /** Writes through a temporary file and renames it, so a kill during the write leaves the old file or the new one, never half of one. */
+    fun writeAtomically(file: File, bytes: ByteArray) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        tmp.writeBytes(bytes)
+        if (!tmp.renameTo(file)) {
+            file.delete()
+            if (!tmp.renameTo(file)) { tmp.delete(); throw java.io.IOException("could not replace ${file.name}") }
+        }
     }
 
     fun delete(dir: File): Boolean = dir.deleteRecursively()
