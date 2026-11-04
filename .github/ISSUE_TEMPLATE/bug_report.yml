@@ -1,20 +1,32 @@
 name: Bug report
-labels: [bug]
 description: Something did not work on a ride or with the camera
+labels: [bug]
 body:
   - type: input
     id: phone
-    attributes: { label: Phone and Android version, placeholder: Samsung Galaxy S25 Ultra, Android 16 }
-    validations: { required: true }
+    attributes:
+      label: Phone and Android version
+      placeholder: "Samsung Galaxy S25 Ultra, Android 16"
+    validations:
+      required: true
   - type: input
     id: camera
-    attributes: { label: Camera and firmware version, placeholder: Osmo Nano, v01.00.0000 }
-    validations: { required: true }
+    attributes:
+      label: Camera and firmware version
+      placeholder: "Osmo Nano, v01.00.0000"
+    validations:
+      required: true
   - type: input
     id: app
-    attributes: { label: App version (release tag), placeholder: v0.1.0-7 }
-    validations: { required: true }
+    attributes:
+      label: App version (release tag)
+      placeholder: "v0.1.0-22"
+    validations:
+      required: true
   - type: textarea
     id: what
-    attributes: { label: What happened, description: "What you did, what you expected, what you saw. Do not post precise GPS tracks you want kept private." }
-    validations: { required: true }
+    attributes:
+      label: What happened
+      description: "What you did, what you expected, what you saw. Do not post precise GPS tracks you want kept private."
+    validations:
+      required: true
