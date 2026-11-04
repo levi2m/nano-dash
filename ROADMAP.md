@@ -8,16 +8,18 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 - Timing: first frame, clip end and clock offset measured on a real camera (see [docs/SYNC.md](docs/SYNC.md)).
 - The `.fit` writer: our own encoder, parsed by two independent decoders, imported by Mimo.
 - Real rides, with the phone locked in a pocket, imported in Mimo and lined up with their clips. A short ride on build 32 (the 360 ms clock offset, rounded seconds and phone-versus-GPS correction) lined up too.
+- Public repository, a signed release from CI on every push to `main` (a separate job holds the signing key; actions pinned), and two security audits with their fixes.
+- Targeting Android 17 (API 37), running on an API 37 phone; the checks a computer can make for accessibility (touch targets, labels, headings, light theme, large font, landscape) pass.
 
 ## Next
 
 1. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger. The ride list now shows the longest wait between GPS fixes; a gap of minutes means the phone paused the app.
-2. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing.
-3. **Robustness:** done: a missing `.fit` is rebuilt automatically, "Export all rides" (a zip, since rides are removed with the app), `format_version` in `meta.json`. Left: a first-run prompt for battery optimisation on Samsung and similar phones (only if the long ride above shows a need), target API 37, and checks of the light theme, large fonts, TalkBack and landscape.
-4. **Engineering:** done: version catalog, R8 release build (signed once `android/keystore.properties` exists), a GitHub Actions workflow that tests every push and publishes a signed release from `main` in a separate job that alone holds the signing key (actions pinned to commit hashes), and the testable app logic moved into `core` (80 tests). Left: only if a concrete problem appears, split `LoggerService` or add a ViewModel.
-5. **Publish:** done: public repository, signed release on every push to `main`, rules and security settings, and two security audits with their fixes. Left: F-Droid. Google Play is probably not happening.
-6. **The merge tool:** combine the camera's own orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`. The camera is rigid on the bike, so it is the better lean source; the GPS estimate stays as the fallback.
-7. **Wear OS companion**, after the phone app is finished: a second GPS source and a start/stop remote, with the phone still holding the camera link.
+2. **F-Droid**, in progress: F-Droid builds from source and signs with its own key, so a GitHub APK and an F-Droid APK cannot update over each other. Needs its metadata file and a clean build check. Google Play is probably not happening.
+3. **Wear OS companion, first version:** a start/stop remote on the watch, with the phone still holding the camera link. A second GPS source from the watch comes later, if at all.
+4. **The merge tool**, undecided: first check on a ride whether Mimo's lean and G widgets already work from the clip's own sensors. If they do, drop it. If not, combine the camera's orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`, keeping the GPS estimate as the fallback.
+5. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing. Waits for someone with two Nanos to file a compatibility report.
+6. **Robustness, what is left:** a real TalkBack walkthrough by a person (the checks that a computer can make passed), and a first-run battery-optimisation prompt only if the long ride shows a need.
+7. **Engineering:** nothing planned. Split `LoggerService` or add a ViewModel only if a concrete problem appears.
 
 ## Left out, and why
 
@@ -33,5 +35,5 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 - [x] Fresh `git init`; keep `PLAN.md`, `footage/`, `*.fit`, `*.mp4` and trial logs out; search the tree for personal data before the first commit.
 - [x] Python tools in `tools/`: short README, no personal paths.
 - [x] Signed release APK (built by CI); the release keystore backed up by the maintainer (losing it means no update can install over the release).
-- [ ] F-Droid: reproducible build, free-software dependencies only (true now).
-- [ ] Application id `io.github.levi2m.nanodash`, fixed once published.
+- [ ] F-Droid: builds from source with free-software dependencies only (true now); metadata file and a clean build check pending. F-Droid signs with its own key.
+- [x] Application id `io.github.levi2m.nanodash`, fixed once published.
