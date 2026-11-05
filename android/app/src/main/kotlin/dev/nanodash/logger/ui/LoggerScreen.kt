@@ -410,9 +410,12 @@ fun LoggerScreen() {
                         SettingRow("Watch", watchName ?: "None chosen", "Choose the watch") { chooseWatch = true }
                         SettingRow("Watch app", if (LoggerService.watchSeen(context) > 0) "Connected before" else "Not seen yet", "Show how to install the watch app") { watchGuide = true }
                     }
-                    SectionLabel("About", Modifier.padding(top = Space.m))
-                    SettingRow("Check for updates", "Opens your browser", "Open the releases page in your browser") {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    // An F-Droid install is updated by F-Droid, so the GitHub link is hidden there.
+                    if (!BuildConfigInfo.fromFDroid(context)) {
+                        SectionLabel("About", Modifier.padding(top = Space.m))
+                        SettingRow("Check for updates", "Opens your browser", "Open the releases page in your browser") {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/levi2m/nano-dash/releases/latest".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        }
                     }
                 }
             },

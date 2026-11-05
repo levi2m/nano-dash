@@ -12,6 +12,9 @@ Nano Dash is a ride logger for the DJI Osmo Nano motorcycle camera. It starts an
 <li>Works with TalkBack and other screen readers: headings, spoken status and route descriptions, large touch targets, light and dark themes and large font sizes.</li>
 </ul>
 
+<b>Optional watch remote</b>
+There is also a Wear OS companion app that starts and stops a ride from your wrist. It is completely optional: Nano Dash does everything without it, and it is not part of this F-Droid build. It is a separate download on the project page and needs developer mode on the watch.
+
 <b>Private by design</b>
 The app has no internet permission. Rides stay on your phone and leave only when you tap Share. There is no account, no analytics and no crash reporting. Backups and device transfers are switched off for the app.
 
