@@ -8,19 +8,20 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 - Timing: first frame, clip end and clock offset measured on a real camera (see [docs/SYNC.md](docs/SYNC.md)).
 - The `.fit` writer: our own encoder, parsed by two independent decoders, imported by Mimo.
 - Real rides, with the phone locked in a pocket, imported in Mimo and lined up with their clips. A short ride on build 32 (the 360 ms clock offset, rounded seconds and phone-versus-GPS correction) lined up too.
-- Public repository, a signed release from CI on every push to `main` (the build job holds the signing key with a read-only token, a separate publish job has the write token; actions pinned by hash, Gradle wrapper validated, a check that no shipped manifest has the internet permission, and a SHA-256 and signing-certificate fingerprint published with each release), and two security audits with their fixes.
-- A Wear OS remote over our own Bluetooth link: Start on the watch, hold to stop, tested by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra.
-- Targeting Android 17 (API 37), running on an API 37 phone. Accessibility: touch targets, labels, headings, light theme, large font and landscape checked, and a person confirmed TalkBack reads it well (build 35).
+- Public repository, a signed release from CI on every push to `main` (the build job holds the signing key with a read-only token, a separate publish job has the write token; actions pinned by hash, Gradle wrapper validated, a check that no shipped manifest has the internet permission, and a SHA-256 and signing-certificate fingerprint published with each release, for both the phone and the watch APK), and three audit rounds with their fixes. The last security audit had no confirmed findings and two points left to validate, listed in [SECURITY.md](SECURITY.md).
+- A Wear OS remote over our own Bluetooth link: Start on the watch, hold to stop, tested end to end by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra (build 46). It is shipped as a second APK in every release.
+- Targeting Android 17 (API 37), running on an API 37 phone. Accessibility: touch targets, labels, headings, light theme, large font and landscape checked, and a person confirmed TalkBack reads the phone's main screen well (build 35).
 
 ## Next
 
 1. **A long ride with the screen off** (45 minutes or more), to see whether the phone's battery management ever stops the logger. The ride list now shows the longest wait between GPS fixes; a gap of minutes means the phone paused the app.
-2. **F-Droid**, in progress: F-Droid builds from source and signs with its own key, so a GitHub APK and an F-Droid APK cannot update over each other. Needs its metadata file and a clean build check. Google Play is a possible later step, see below.
-3. **Wear OS remote:** built and working on a Galaxy Watch6 Classic (build 40): Start with a tap, Stop with a hold, the ride state, three haptic patterns and a TalkBack action. Design in [docs/WEAR_OS.md](docs/WEAR_OS.md) and [docs/WEAR_UI.md](docs/WEAR_UI.md). Left: the tile, an easier way to install it than wireless debugging, and the watch's GPS as a second source only if it is wanted.
+2. **F-Droid**, in progress: F-Droid builds from source and signs with its own key, so a GitHub APK and an F-Droid APK cannot update over each other. The recipe and listing are in the repository (the recipe still points at build 35). Left: run the recipe through `fdroidserver`, then file the merge request. The watch app would stay GitHub-only. Google Play is a possible later step, see below.
+3. **Wear OS remote:** built and working on a Galaxy Watch6 Classic: Start with a tap, Stop with a hold, the ride state, three haptic patterns and a TalkBack action. Design in [docs/WEAR_OS.md](docs/WEAR_OS.md) and [docs/WEAR_UI.md](docs/WEAR_UI.md). Left: a ride started from the watch with GPS fixes outdoors (not confirmed yet), TalkBack on the Settings sheet and the watch screens, other watches, the tile, an easier way to install it than ADB, and the watch's GPS as a second source only if it is wanted.
 4. **The merge tool**, undecided: first check on a ride whether Mimo's lean and G widgets already work from the clip's own sensors. If they do, drop it. If not, combine the camera's orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`, keeping the GPS estimate as the fallback.
 5. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing. Waits for someone with two Nanos to file a compatibility report.
 6. **Robustness, what is left:** a first-run battery-optimisation prompt, only if the long ride shows a need.
-7. **Engineering:** nothing planned. Split `LoggerService` or add a ViewModel only if a concrete problem appears.
+7. **Supply chain:** Gradle dependency verification is not set up yet; dependencies are pinned by version but not checked by hash.
+8. **Engineering:** nothing planned. Split `LoggerService` or add a ViewModel only if a concrete problem appears.
 
 ## Possible later
 

@@ -5,7 +5,7 @@ F-Droid builds the app from source and signs it with its own key, so an F-Droid 
 ## What is ready in this repository
 
 - **Listing:** `fastlane/metadata/android/en-US/` holds the title, short and full description and a changelog (named by version code); screenshots go in `images/phoneScreenshots/` once a fresh one is taken. F-Droid reads them from here.
-- **Recipe draft:** `fdroid/io.github.levi2m.nanodash.yml`, to be copied into the F-Droid data repository. It has not been run through F-Droid's own build yet.
+- **Recipe draft:** `fdroid/io.github.levi2m.nanodash.yml`, to be copied into the F-Droid data repository. It has not been run through F-Droid's own build yet, and the merge request has not been filed. It builds only the phone app (`subdir: android/app`); the watch APK stays a GitHub-only download. It is pinned to build 35 (tag `v0.1.0-35`, which predates the `fastlane` folder, so the tag itself has no listing or changelog); the latest release is newer.
 - **Source checks that were run** (see the results at the end of this file): a fresh public clone builds the release APK with no signing key, the two builds can be compared, and the dependency list has no Google Play services, analytics or crash reporters.
 - **Licences:** the app is Apache-2.0. Its dependencies are AndroidX, Kotlin and Compose, all free software.
 
@@ -18,7 +18,7 @@ F-Droid builds the app from source and signs it with its own key, so an F-Droid 
 
 ## Updating later
 
-The recipe lists builds by hand. Every push to `main` creates a GitHub release, so tags are not a signal for F-Droid. When a build is worth shipping, add an entry with that release's version code and tag, and update `CurrentVersion` and `CurrentVersionCode`.
+The recipe lists builds by hand. Every push to `main` creates a GitHub release, so tags are not a signal for F-Droid. When a build is worth shipping, add an entry with that release's version code and tag (also in `gradleprops`), and update `CurrentVersion` and `CurrentVersionCode`. Add `fastlane/metadata/android/en-US/changelogs/<version code>.txt` (500 bytes at most) in a commit that is already in that tag, so push the changelog before the release run that is meant to ship. Whether F-Droid reads the listing from the tag or from the default branch has not been checked. The listing text does not mention the watch remote yet; add it when the recipe moves past build 35.
 
 ## Results of the source checks (commit 4aa1a34, version code 34)
 

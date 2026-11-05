@@ -6,7 +6,7 @@ body:
     id: phone
     attributes:
       label: Phone and Android version
-      placeholder: "Samsung Galaxy S25 Ultra, Android 16"
+      placeholder: "Samsung Galaxy S25 Ultra, Android 17"
     validations:
       required: true
   - type: input
@@ -19,8 +19,8 @@ body:
   - type: input
     id: app
     attributes:
-      label: App version (release tag)
-      placeholder: "v0.1.0-22"
+      label: App version (release tag, or the build number at the bottom of the app)
+      placeholder: "v0.1.0-46"
     validations:
       required: true
   - type: dropdown

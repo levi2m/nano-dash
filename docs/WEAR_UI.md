@@ -100,7 +100,7 @@ Plain words, sentence case, no em dashes, short enough for a 1.47 inch screen. E
 - **TalkBack, status:** every screen has a pane title. "Saved" and the error messages are assertive live regions, "Ready", the spinners ("Starting ride", "Saving ride") and other messages are polite ones. Titles, "Ready" and the timer are headings. The timer is one merged node, "Riding for 12 minutes 45 seconds", with no live region (it would read every second). The status dots read as their words.
 - **Allow Bluetooth** uses the same pill (Button role) and message layout as the other screens.
 - **Not colour alone:** every dot has a word beside it.
-- **Large text:** pills are at least 64 dp and grow, labels wrap, status words wrap, the message text scrolls above the button. The timer and the hero word follow the font scale up to 1.3x and then stop growing, so they fit a round screen. Reasoned, not yet tried on a device at 1.3x and 2x.
+- **Large text:** pills are at least 64 dp and grow, labels wrap, status words wrap, the message text scrolls above the button. The timer and the hero word follow the font scale up to 1.3x and then stop growing, so they fit a round screen. Reasoned, not yet tried on a device at 1.3x and 2x. The TalkBack behaviour above was reasoned from the source and installed on the watch; the owner has not confirmed it with TalkBack yet.
 - **Reduced motion:** with the system animation scale at 0 the spinner is a still arc.
 - **Haptics:** start, stop and error each have a different pattern, so they can be told apart without looking.
 
@@ -114,5 +114,5 @@ Speed, a map, heart rate, a complication, and the tile (milestone 4: the same he
 - **Wear OS 4 (API 31) is the minimum.** The vibration and Bluetooth permission APIs the app uses start there, and supporting Wear OS 3 as well was not worth the extra code.
 - **No ambient screen of its own.** Wear OS leaves the app as it is and the watch's own timeout takes over.
 - **Spinner and pill buttons are drawn by the app** (the pill is 64 dp tall and 78 percent of the width), instead of using the library's edge button, so their size and feel are exactly as specified.
-- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: start, the running screen, hold to stop, and the saved ride all work.
+- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: start, the running screen, hold to stop, and the saved ride all work (build 40, and again on build 46).
 - **Accessibility pass:** the hold-to-stop label is spoken as "Hold to stop" and never stops the ride on a single TalkBack activation; the label is two-colour so it stays readable while the red fills; state changes are announced (live regions, pane titles, headings); the spinner is still when animations are off; pills grow with the font; the secondary pill has an outline; the Allow pill is a proper button. Details in section 6.

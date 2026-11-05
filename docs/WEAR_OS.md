@@ -1,6 +1,6 @@
 # Wear OS remote: design
 
-Status: built and working (build 40): the armed phone service, the Bluetooth link, and the watch app (see section 13). The notification-only route from section 3 stays as a fallback. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
+Status: built and working, tested by the maintainer on a Galaxy Watch6 Classic with build 46: the armed phone service, the Bluetooth link, and the watch app (see section 13). The tile is not built. The notification-only route from section 3 stays as a fallback. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
 
 ## 1. What is needed, and what is not
 
@@ -23,7 +23,7 @@ Status: built and working (build 40): the armed phone service, the Bluetooth lin
 | C | A real watch app talking to the phone over its own Bluetooth link | None, but needs a pairing secret and a GATT server on the phone | The most code and the most security work | Not justified for a button |
 | D | Watch GPS as a second source | Needs B or C plus clock sync and merging | Large | **No**: the phone's GPS already works, and a second source adds sync error |
 
-The deciding question is whether A already gives a usable remote. It may, because the app already shows an ongoing notification with a **Stop** action (`LoggerService.kt:450-460`, immutable `PendingIntent`, explicit service target).
+The deciding question is whether A already gives a usable remote. It may, because the app already shows an ongoing notification with a **Stop** action (immutable `PendingIntent`, explicit service target).
 
 ## 3. Recommended path
 
@@ -100,7 +100,7 @@ No new process, no new permission, no new network use. The only new code is in h
 
 **Built:**
 - The ride notification is explicitly mirrorable (`setLocalOnly(false)`), and `ACTION_START` and `ACTION_STOP` are handled by name: a stray intent no longer starts a ride.
-- **Quick start from the watch** (off by default, a switch at the bottom of the screen): while it is on, a silent ongoing notification "Nano Dash is ready" with a **Start ride** button stays on the phone whenever no ride is running. It uses the same notification id as the ride notification, so starting a ride replaces it in place, and it comes back when the ride ends.
+- **Quick start from the watch** (off by default; the switch is now in the Settings sheet, top right): while it is on, a silent ongoing notification "Nano Dash is ready" with a **Start ride** button stays on the phone whenever no ride is running. It uses the same notification id as the ride notification, so starting a ride replaces it in place, and it comes back when the ride ends.
 
 **Tested on the phone (Galaxy S25 Ultra, Android 17 / API 37, app in the background, not opened):**
 - Tapping **Start ride** in the notification started the ride service as a foreground service with the location and connected-device types. No error in the log, a ride folder was created, and the service registered for 1 Hz high-accuracy GPS.
@@ -117,7 +117,7 @@ No new process, no new permission, no new network use. The only new code is in h
 The notification route was tried first (build 36). On the Galaxy Watch6 Classic nothing showed up on the watch, and a notification is a poor remote anyway: it is buried on a watch. So the roadmap item becomes a watch app. The choices, made with the maintainer:
 
 - **Transport:** our own Bluetooth link, not Google's Data Layer. The phone app keeps no Google dependency and stays F-Droid-clean.
-- **Watch app:** one screen with Start and Stop, the ride state, and a tile for one-swipe access.
+- **Watch app:** one screen with Start and Stop and the ride state. A tile for one-swipe access was planned and is not built.
 - **Installing it:** a second APK in each GitHub release, installed on the watch over wireless debugging. F-Droid cannot install onto a watch.
 
 ### How the link works
@@ -130,7 +130,7 @@ The watch and the phone are already paired by Bluetooth. The phone opens a **sec
 
 ### Why the phone service has an "armed" mode
 
-The phone has to be listening while the app is closed, and Android does not let an app start a location service from the background on its own. The quick-start test showed a notification button is allowed, but a Bluetooth message is not on that list. So the phone starts its ride service **while the app is on screen** (when the user switches "Watch remote" on), and that service waits in an armed state: a foreground notification, the Bluetooth listener, and no GPS or sensors. A Start from the watch then only changes the state of a service that is already running, so no new foreground service has to be started from the background. Stop returns it to armed. Switching it off stops the service.
+The phone has to be listening while the app is closed, and Android does not let an app start a location service from the background on its own. The quick-start test showed a notification button is allowed, but a Bluetooth message is not on that list. So the phone starts its ride service **while the app is on screen** (when the user switches "Quick start from the watch" on in Settings), and that service waits in an armed state: a foreground notification, the Bluetooth listener, and no GPS or sensors. A Start from the watch then only changes the state of a service that is already running, so no new foreground service has to be started from the background. Stop returns it to armed. Switching it off stops the service.
 
 Cost: one quiet notification while it is on, and it must be switched on again after a restart of the phone.
 
@@ -158,15 +158,16 @@ Two things the spike taught:
 
 Next: milestone 2, the armed phone service and the real handler.
 
-## 13. Built and tested (build 40)
+## 13. Built and tested (build 46)
 
 - **Phone:** the service has an armed mode (a "Nano Dash is ready" notification, no GPS, a Bluetooth listener) switched by "Quick start from the watch". It serves only the paired device the rider chose, answers `STATUS`, and turns `START` and `STOP` into a real ride on the main thread. A start is refused with a reason (`gps-off`, `no-permission`, `busy`) when it cannot happen. The phone app asks for location, Bluetooth and notification permission the first time.
 - **Watch:** `:wear` is a Wear OS 4 app that reaches the phone over the paired link, polls its state every 1.5 seconds and reconnects by itself. Its screens follow [WEAR_UI.md](WEAR_UI.md).
 - **CI** builds both APKs and attaches them to every release: `nano-dash-<tag>.apk` for the phone and `nano-dash-wear-<tag>.apk` for the watch.
 - **Installing the watch app:** enable developer mode on the watch, turn on Debug over Wi-Fi, then `adb connect <watch ip:port>` and `adb install nano-dash-wear-<tag>.apk`. F-Droid cannot install onto a watch.
-- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: everything worked.
+- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: everything worked, including build 46.
+- **Fixes since then** (audits): a crash when the watch link thread was interrupted, the watch link restarting after the permission is granted, a start and save race, and the notification Start button asking for an unlock on Android 12 and later. The watch's own Start does not ask for one, since the phone is locked in a pocket.
 
-**Still open:** the tile, a simpler way to install the watch app, the behaviour on other watches, and whether a ride started from the watch receives GPS fixes outdoors (the service type is chosen to allow it, but only a ride outdoors proves it).
+**Still open:** the tile, a simpler way to install the watch app, the behaviour on other watches, TalkBack on the watch screens and the phone's Settings sheet (not yet confirmed by the owner), and whether a ride started from the watch receives GPS fixes outdoors (the service type is chosen to allow it, but only a ride outdoors proves it).
 
 ## 14. Getting the watch app onto the watch (decision)
 

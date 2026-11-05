@@ -35,7 +35,7 @@ How the 357 to 361 ms was found. Run `tools/ble-spike/set_clock_trials.py` (sets
 
 ## Real rides
 
-Three rides on 2026-11-03, made with the earlier 1.7 s shift and truncated seconds: the file's camera window started 1 to 2 s after the clip header and ended within 1 s of the clip's end, which is the header's resolution. The 360 ms offset, rounding and the GPS correction have not been checked on a ride yet.
+Three rides on 2026-11-03, made with the earlier 1.7 s shift and truncated seconds: the file's camera window started 1 to 2 s after the clip header and ended within 1 s of the clip's end, which is the header's resolution. A later short ride on build 32, with the phone locked in a pocket and the screen off, lined up with its clip in Mimo, so the 360 ms offset, rounding and the GPS correction hold for that ride. Longer rides and a second camera are still untested.
 
 ## Limits
 
