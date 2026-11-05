@@ -19,7 +19,7 @@ Each release carries four assets and the notes:
 
 - `nano-dash-<tag>.apk` (phone) and `nano-dash-wear-<tag>.apk` (watch)
 - `nano-dash-<tag>.apk.sha256` and `nano-dash-wear-<tag>.apk.sha256`, in `sha256sum` format: download next to the APK and run `sha256sum -c <file>.sha256`
-- notes that begin with each APK's SHA-256 and the SHA-256 of the signing certificate (from `apksigner verify --print-certs`, or `keytool -printcert -jarfile` if apksigner is missing), followed by GitHub's generated change list. The certificate fingerprint must be the same on every release; compare it with `apksigner verify --print-certs` on the APK you installed.
+- notes that begin with each APK's SHA-256 and the SHA-256 of the signing certificate (from `apksigner verify --print-certs`, from the SDK build-tools on the runner; the build fails if apksigner is missing), followed by GitHub's generated change list. The certificate fingerprint must be the same on every release; compare it with `apksigner verify --print-certs` on the APK you installed.
 
 If the key secrets are missing, `build` skips its steps and `publish` does not run.
 
