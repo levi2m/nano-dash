@@ -19,8 +19,11 @@ echo "Check a download with \`sha256sum -c <file>.sha256\`, and compare the cert
 echo
 for apk in "$@"; do
   sum=$(sha256sum "$apk" | cut -d' ' -f1)
-  cert=$("$apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
-  [ -n "$cert" ] || { echo "could not read the signing certificate of $apk (apksigner: $apksigner)" >&2; exit 1; }
+  out=$("$apksigner" verify --print-certs "$apk" 2>&1 || true)
+  cert=$(printf "%s
+" "$out" | grep -i "certificate SHA-256 digest" | head -1 | sed "s/.*: *//")
+  [ -n "$cert" ] || { echo "could not read the signing certificate of $apk (apksigner: $apksigner)" >&2; printf "%s
+" "$out" | head -8 >&2; exit 1; }
   echo "- \`$(basename "$apk")\`"
   echo "  - SHA-256: \`$sum\`"
   echo "  - signing certificate SHA-256: \`$cert\`"
