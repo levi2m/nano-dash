@@ -20,8 +20,8 @@ Repo: https://github.com/levi2m/nano-dash.git
 
 Builds:
   - versionName: 0.1.0
-    versionCode: 35
-    commit: v0.1.0-35
+    versionCode: 48
+    commit: v0.1.0-48
     subdir: android/app
     # The project is built with JDK 21 (see android/core/build.gradle.kts); the build server may have an older one.
     sudo:
@@ -32,11 +32,11 @@ Builds:
       - yes
     # CI passes the build number as -PversionCode, so the recipe has to as well, or the APK would say 1.
     gradleprops:
-      - versionCode=35
+      - versionCode=48
 
 # One entry per release that should reach F-Droid. Every push to main makes a GitHub release, so tags are not an update
 # signal here; add an entry by hand (or pick a separate tag pattern) when a build is worth shipping.
 AutoUpdateMode: None
 UpdateCheckMode: None
 CurrentVersion: 0.1.0
-CurrentVersionCode: 35
+CurrentVersionCode: 48
