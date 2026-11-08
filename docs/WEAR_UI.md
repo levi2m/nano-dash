@@ -106,7 +106,7 @@ Plain words, sentence case, no em dashes, short enough for a 1.47 inch screen. E
 
 ## 7. Not in the first version
 
-Speed, a map, heart rate, a complication, and the tile (milestone 4: the same hero and button, refreshed over the same link). Each is a separate decision, because the half-second glance is the product.
+Speed, a map, heart rate, a complication, and a tile that shows the ride state (the built tile only opens the app, see WEAR_OS.md section 15). Each is a separate decision, because the half-second glance is the product.
 
 ## 8. What changed while building (build 40)
 

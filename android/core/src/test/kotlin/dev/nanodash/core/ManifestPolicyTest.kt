@@ -54,8 +54,12 @@ class ManifestPolicyTest {
     }
 
     @Test
-    fun onlyTheWatchLauncherActivityIsExported() {
-        assertEquals(mapOf(".MainActivity" to "true"), exportedComponents(parse(File(wear, "AndroidManifest.xml"))))
+    fun theWatchExportsOnlyItsLauncherAndATileOnlyTheSystemCanBind() {
+        val doc = parse(File(wear, "AndroidManifest.xml"))
+        assertEquals(mapOf(".MainActivity" to "true", ".RideTile" to "true"), exportedComponents(doc))
+        // Only the system's tile host holds this permission, so no other app can bind the tile service.
+        val tile = doc.getElementsByTagName("service").item(0).attributes
+        assertEquals("com.google.android.wearable.permission.BIND_TILE_PROVIDER", tile.getNamedItemNS(androidNs, "permission")?.nodeValue)
     }
 
     @Test

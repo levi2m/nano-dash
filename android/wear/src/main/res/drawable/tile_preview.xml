@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The picture in the tile picker: a black round face with the ember Ride button, as the tile draws it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+    <path android:fillColor="#FF000000" android:pathData="M96,0a96,96 0,1 1,0 192a96,96 0,1 1,0 -192z" />
+    <path android:fillColor="#FFFF7A1A" android:pathData="M96,62a40,40 0,1 1,0 80a40,40 0,1 1,0 -80z" />
+    <path android:fillColor="#FFA1A1A6" android:pathData="M70,44h52v6h-52z" />
+</vector>

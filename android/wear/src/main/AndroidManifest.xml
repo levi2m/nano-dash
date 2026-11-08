@@ -27,6 +27,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- The tile: one swipe from the watch face to the remote. Only the system tile host can bind it. -->
+        <service
+            android:name=".RideTile"
+            android:exported="true"
+            android:label="Nano Dash"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_preview" />
+        </service>
     </application>
 
 </manifest>
