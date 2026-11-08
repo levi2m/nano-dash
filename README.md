@@ -53,6 +53,7 @@ The `core` module (camera protocol, FIT writer, ride assembly) is plain Kotlin w
 - [docs/SYNC.md](docs/SYNC.md): how the `.fit` is lined up with the video, and how that was measured
 - [docs/FIT.md](docs/FIT.md): what the `.fit` and a ride folder contain
 - [docs/WEAR_OS.md](docs/WEAR_OS.md) and [docs/WEAR_UI.md](docs/WEAR_UI.md): the watch remote and its screens
+- [docs/GARMIN.md](docs/GARMIN.md): plan for a Garmin watch remote (idea only, not built)
 - [docs/RELEASING.md](docs/RELEASING.md) and [docs/FDROID.md](docs/FDROID.md): how releases are built, and the F-Droid plan
 - [ROADMAP.md](ROADMAP.md): what is proven, next and left out
 - [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md)
