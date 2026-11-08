@@ -25,6 +25,7 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 
 ## Possible later
 
+- **Garmin remote** (lower priority, nothing built). The same Start and hold-to-stop remote for newer Garmin watches, as a Connect IQ app. Needs a different phone link from Wear OS; the plan is to support both Bluetooth LE (main route) and Garmin's proprietary Mobile SDK (second route, GitHub-only flavour). Plan and open questions in [docs/GARMIN.md](docs/GARMIN.md). First step: collect the watch model from a user who has one and check Garmin's current documentation; no code before that.
 - **Google Play.** Not decided. It would need:
   - A Play Console developer account (one-time fee, identity verification). A new personal account has to run a closed test with opted-in testers for 14 days before production; check the current tester count in Play Console.
   - An Android App Bundle (`bundleRelease`) and Play App Signing. Play signs with its own key, so a Play install, a GitHub APK and an F-Droid install cannot update over each other.
