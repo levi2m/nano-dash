@@ -1,6 +1,6 @@
 # Draft F-Droid build recipe for Nano Dash. It is NOT used by this repository's own build; it is the file to copy into
 # the F-Droid data repository (https://gitlab.com/fdroid/fdroiddata, as metadata/io.github.levi2m.nanodash.yml) when
-# opening the merge request. It has not been run through `fdroid build` yet: see docs/FDROID.md for how to test it.
+# opening the merge request. `fdroid lint` and `fdroid build` pass with it locally (docs/FDROID.md has the steps and results).
 # The version name is nanodash.versionName in android/gradle.properties (both apps read it there); keep `versionName` below equal to it.
 # The name, summary, description and screenshots come from fastlane/metadata/android/en-US in this repository.
 

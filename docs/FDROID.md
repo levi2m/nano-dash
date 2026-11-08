@@ -29,7 +29,21 @@ Whether F-Droid reads the listing from the built commit or from the default bran
 
 ## Testing the recipe locally
 
-In WSL or Linux, with the Android SDK in `~/Android/Sdk` and JDK 21: `pipx install fdroidserver`, then make a folder with `config.yml` (`sdk_path: <sdk>`), `config/categories.yml` from fdroiddata, and the recipe in `metadata/`. Run `fdroid lint io.github.levi2m.nanodash` and `fdroid build -v -l io.github.levi2m.nanodash` there. A local build skips the `sudo` step, so it uses the JDK already installed.
+In WSL or Linux, with the Android SDK and JDK 21 installed:
+
+1. `pipx install fdroidserver`.
+2. A sparse clone of fdroiddata with only its `config/` folder (lint needs its category list and icons): `git clone --depth 1 --filter=blob:none --sparse https://gitlab.com/fdroid/fdroiddata.git && git -C fdroiddata sparse-checkout set config`.
+3. Copy the recipe to `fdroiddata/metadata/`, and add to `fdroiddata/config.yml`: `sdk_path:` (the SDK), `java_paths:` with `21:` (the JDK folder; F-Droid clears `JAVA_HOME`), and `gradle:` pointing at F-Droid's launcher, `gradlew.py` from https://gitlab.com/fdroid/gradlew-fdroid (the pip package does not include it, and F-Droid deletes `gradle-wrapper.jar`, so our wrapper cannot run).
+4. Clone the app into `fdroiddata/build/io.github.levi2m.nanodash` first (fdroidserver 2.4.5 reads its commit date before cloning).
+5. In `fdroiddata/`: `fdroid lint io.github.levi2m.nanodash`, then `fdroid build -v -l io.github.levi2m.nanodash`.
+
+A local build skips the `sudo` step, so it uses the JDK already installed; F-Droid's build server runs it.
+
+## Results of the recipe test (version code 48, commit 295eadf)
+
+- `fdroid lint` passes (fdroidserver 2.4.5, categories from fdroiddata).
+- `fdroid build` succeeds: the source scanner only removes `gradle-wrapper.jar`, as it always does, and Gradle 9.8.2 with JDK 21 builds `io.github.levi2m.nanodash_48.apk` (1.1 MB, unsigned), version code 48, version 0.1.0, with no internet permission. The watch app is not built.
+- Not tested: the `sudo` step that installs JDK 21 on F-Droid's build server, and F-Droid's reproducibility check against our signed APK (not used: F-Droid signs with its own key).
 
 ## Results of the source checks (commit 4aa1a34, version code 34)
 
