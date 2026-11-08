@@ -7,4 +7,5 @@ The most useful contributions are real-world measurements and bug reports.
 - **Code:** `core` is pure Kotlin with no Android dependency; keep it that way and add a test for new logic. Run `./gradlew :core:test :app:lintDebug :wear:lintDebug` from `android/` before sending a change; CI runs the same and builds both apps.
 - **Do not add** code or documents taken from DJI's SDK or developer material, or Garmin's FIT SDK: their licences do not allow it. Protocol facts must come from observation of your own camera or from MIT-licensed sources such as Osmosis.
 - **Privacy:** no network access (neither app may declare the internet permission; `scripts/check-no-internet.sh` checks it in CI), no analytics, no crash reporters.
+- **AI-assisted changes** follow [AGENTS.md](AGENTS.md), which lists the rules agents tend to miss.
 - Licence: contributions are under Apache-2.0.
