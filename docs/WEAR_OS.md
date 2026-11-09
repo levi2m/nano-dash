@@ -1,6 +1,6 @@
 # Wear OS remote: design
 
-Status: built and working, tested by the maintainer on a Galaxy Watch6 Classic with build 46: the armed phone service, the Bluetooth link, and the watch app (see section 13). The tile is not built. The notification-only route from section 3 stays as a fallback. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
+Status: built and working, tested by the maintainer on a Galaxy Watch6 Classic with build 46: the armed phone service, the Bluetooth link, and the watch app (see section 13). A tile that opens the app is built but not yet tested on a watch (section 15). The notification-only route from section 3 stays as a fallback. The roadmap item is "a start/stop remote on the watch, with the phone still holding the camera link".
 
 ## 1. What is needed, and what is not
 
@@ -117,7 +117,7 @@ No new process, no new permission, no new network use. The only new code is in h
 The notification route was tried first (build 36). On the Galaxy Watch6 Classic nothing showed up on the watch, and a notification is a poor remote anyway: it is buried on a watch. So the roadmap item becomes a watch app. The choices, made with the maintainer:
 
 - **Transport:** our own Bluetooth link, not Google's Data Layer. The phone app keeps no Google dependency and stays F-Droid-clean.
-- **Watch app:** one screen with Start and Stop and the ride state. A tile for one-swipe access was planned and is not built.
+- **Watch app:** one screen with Start and Stop and the ride state. A tile for one-swipe access opens the app (section 15).
 - **Installing it:** a second APK in each GitHub release, installed on the watch over wireless debugging. F-Droid cannot install onto a watch.
 
 ### How the link works
@@ -167,8 +167,16 @@ Next: milestone 2, the armed phone service and the real handler.
 - **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: everything worked, including build 46.
 - **Fixes since then** (audits): a crash when the watch link thread was interrupted, the watch link restarting after the permission is granted, a start and save race, and the notification Start button asking for an unlock on Android 12 and later. The watch's own Start does not ask for one, since the phone is locked in a pocket.
 
-**Still open:** the tile, a simpler way to install the watch app, the behaviour on other watches, TalkBack on the watch screens and the phone's Settings sheet (not yet confirmed by the owner), and whether a ride started from the watch receives GPS fixes outdoors (the service type is chosen to allow it, but only a ride outdoors proves it).
+**Still open:** a test of the tile on a watch, a simpler way to install the watch app, the behaviour on other watches, TalkBack on the watch screens and the phone's Settings sheet (not yet confirmed by the owner), and whether a ride started from the watch receives GPS fixes outdoors (the service type is chosen to allow it, but only a ride outdoors proves it).
 
 ## 14. Getting the watch app onto the watch (decision)
 
 Wear OS has no sideload installer and only Google Play or ADB can install an app, so the phone app cannot push the APK. An in-app ADB client would need the INTERNET permission, which breaks the no-network promise. So the phone app carries a guide instead: a "Watch app" row under the quick start toggle shows "not seen yet" or "connected before" (the time the watch last finished the handshake is stored in the app's own preferences) and opens the install steps with a link to the latest release. No new permission. A watch-only store listing stays an option for later.
+
+## 15. The tile (built, not tested on a watch)
+
+A tile puts the remote one swipe from the watch face. It shows "Nano Dash" and one round ember **Ride** button (black label, 8.0:1 contrast, 96 dp); tapping it opens the watch app, which reaches the phone within about two seconds. TalkBack reads it as "Open Nano Dash to start or stop a ride".
+
+- **Why it only opens the app:** a tile is redrawn by the system on its own schedule and cannot keep the phone link open, so a state shown there would often be stale, and a Start or Stop sent from a tile could not report whether it worked. Opening the app keeps one place for the link, the haptics and hold-to-stop. Showing the ride state on the tile is a later decision, only if riders ask for it.
+- **Built with** AndroidX Wear Tiles and ProtoLayout (Apache-2.0, no Google Play services). The tile service is exported, as every tile must be, but only the system's tile host can bind it (`BIND_TILE_PROVIDER`); `ManifestPolicyTest` checks both.
+- **Not tested yet:** adding it from the watch's tile list, how it looks on the Galaxy Watch6 Classic, and TalkBack on it.
