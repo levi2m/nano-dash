@@ -45,6 +45,13 @@ android {
         compose = true
     }
 
+    // Android's build tools add an encrypted dependency list to the signing block, which only Google Play reads.
+    // F-Droid's scanner rejects it, and our dependencies are public anyway (the licence list and verification-metadata.xml).
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
