@@ -18,7 +18,7 @@ Ride logger for the DJI Osmo Nano on a motorcycle. It starts and stops the camer
 - Wear OS remote (optional, off by default): start a ride with one tap and stop it with a press and hold from a Galaxy Watch (or another Wear OS 4 watch), with the phone staying in the pocket. Switch on "Quick start from the watch" in the phone app (Settings, top right), choose your watch from the paired devices, and install the watch APK from the release over ADB with developer mode on the watch (the phone app has a "Watch app" row with the steps and shows "Connected before" or "Not seen yet"; Wear OS cannot install an app from the phone, and an installer would need the internet permission this app does not have). Start from the notification needs the phone unlocked on Android 12 and later; Start from the watch does not. The phone keeps one quiet notification while it is on. The link is a Bluetooth serial channel over the watch's existing pairing: no network and no Google libraries. See [docs/WEAR_OS.md](docs/WEAR_OS.md).
 - Opens a ride's route in a maps app that reads GPX (OsmAnd, Organic Maps and others): tap the route preview on the ride. The app draws no map itself, so it needs no network.
 - Works with screen readers such as TalkBack: section titles are marked as headings, each status row is read as one phrase (for example "GPS: Location is on"), the route preview and the live speed have spoken descriptions, and every control is at least 48 dp. It follows the phone's light or dark theme and large font sizes. The main screen has been checked with TalkBack on one phone. The Settings sheet and the watch screens were written to the same rules and installed, but have not been confirmed with TalkBack yet; reports of anything that reads badly are welcome.
-- Shows its version and build number at the bottom of the screen, with a credit line ("Built by levi2m and his AI agents", where levi2m opens the author's GitHub page). Settings has a "Check for updates" row that opens the releases page in your browser. The app makes no request itself; compare the build number with the latest tag (`v0.1.0-46` is build 46).
+- Shows its version and build number at the bottom of the screen, with a credit line ("Built by levi2m and his AI agents", where levi2m opens the author's GitHub page). Settings has a "Check for updates" row that opens the releases page in your browser (hidden on F-Droid installs, which F-Droid updates). The app makes no request itself; the build number is the number after the dash in a release tag, for example `v0.1.0-58` is build 58.
 - Keeps everything on the phone. The app has no internet permission, and rides leave only when you tap Share.
 
 Only Mimo draws the overlays, so Mimo is needed once, at the end, to import the `.fit` with the clip.
@@ -54,7 +54,7 @@ The `core` module (camera protocol, FIT writer, ride assembly) is plain Kotlin w
 - [docs/FIT.md](docs/FIT.md): what the `.fit` and a ride folder contain
 - [docs/WEAR_OS.md](docs/WEAR_OS.md) and [docs/WEAR_UI.md](docs/WEAR_UI.md): the watch remote and its screens
 - [docs/GARMIN.md](docs/GARMIN.md): plan for a Garmin watch remote (idea only, not built)
-- [docs/RELEASING.md](docs/RELEASING.md) and [docs/FDROID.md](docs/FDROID.md): how releases are built, and the F-Droid plan
+- [docs/RELEASING.md](docs/RELEASING.md) and [docs/FDROID.md](docs/FDROID.md): how releases are built, and the reproducible F-Droid build
 - [ROADMAP.md](ROADMAP.md): what is proven, next and left out
 - [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md)
 

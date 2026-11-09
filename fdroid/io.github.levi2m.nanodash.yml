@@ -1,12 +1,12 @@
-# Draft F-Droid build recipe for Nano Dash. It is NOT used by this repository's own build; it is the file to copy into
-# the F-Droid data repository (https://gitlab.com/fdroid/fdroiddata, as metadata/io.github.levi2m.nanodash.yml) when
-# opening the merge request. `fdroid lint` and `fdroid build` pass with it locally (docs/FDROID.md has the steps and results).
-# The version name is nanodash.versionName in android/gradle.properties (both apps read it there); keep `versionName` below equal to it.
-# The name, summary, description and screenshots come from fastlane/metadata/android/en-US in this repository.
+# F-Droid build recipe for Nano Dash, as submitted to fdroiddata (metadata/io.github.levi2m.nanodash.yml there).
+# It is NOT used by this repository's own build. Reproducible: F-Droid rebuilds the tagged release, checks it is
+# byte-for-byte the GitHub APK (Binaries) and then ships that APK with our signature (AllowedAPKSigningKeys), so
+# GitHub and F-Droid installs update over each other. docs/FDROID.md has the local test and how to add a release.
+# Keep `versionName` equal to nanodash.versionName in android/gradle.properties. The listing comes from fastlane/.
 
 Categories:
-  - Sports & Health
   - Camera
+  - Sports & Health
 License: Apache-2.0
 AuthorName: levi2m
 WebSite: https://github.com/levi2m/nano-dash
@@ -18,28 +18,26 @@ AutoName: Nano Dash
 
 RepoType: git
 Repo: https://github.com/levi2m/nano-dash.git
+Binaries: 
+  https://github.com/levi2m/nano-dash/releases/download/v%v-%c/nano-dash-v%v-%c.apk
 
 Builds:
   - versionName: 0.1.0
-    versionCode: 48
-    # A commit, not a tag: this commit carries changelogs/48.txt. No GitHub release has number 48 (that CI run checked a
-    # pull request), which is harmless, as the F-Droid APK is signed with F-Droid's key anyway.
-    commit: 295eadf1df878d1637a7ef88e5e1539ec7aaaf9e
+    versionCode: 64
+    commit: 0503b45e660972ca792da5c5a09c62e6dfa33ceb
     subdir: android/app
-    # The project is built with JDK 21 (see android/core/build.gradle.kts); the build server may have an older one.
     sudo:
       - apt-get update
       - apt-get install -y openjdk-21-jdk-headless
       - update-alternatives --auto java
     gradle:
       - yes
-    # CI passes the build number as -PversionCode, so the recipe has to as well, or the APK would say 1.
     gradleprops:
-      - versionCode=48
+      - versionCode=64
 
-# One entry per release that should reach F-Droid. Every push to main makes a GitHub release, so tags are not an update
-# signal here; add an entry by hand (or pick a separate tag pattern) when a build is worth shipping.
+AllowedAPKSigningKeys: b728abd0c4634f976f2e77c213100331bc448aca608c0687eb24916d97e3b4f2
+
 AutoUpdateMode: None
 UpdateCheckMode: None
 CurrentVersion: 0.1.0
-CurrentVersionCode: 48
+CurrentVersionCode: 64
