@@ -23,8 +23,8 @@ Binaries:
 
 Builds:
   - versionName: 0.1.0
-    versionCode: 58
-    commit: 143248c47f3da127f730c23fd240528d3226454b
+    versionCode: 64
+    commit: 0503b45e660972ca792da5c5a09c62e6dfa33ceb
     subdir: android/app
     sudo:
       - apt-get update
@@ -33,11 +33,11 @@ Builds:
     gradle:
       - yes
     gradleprops:
-      - versionCode=58
+      - versionCode=64
 
 AllowedAPKSigningKeys: b728abd0c4634f976f2e77c213100331bc448aca608c0687eb24916d97e3b4f2
 
 AutoUpdateMode: None
 UpdateCheckMode: None
 CurrentVersion: 0.1.0
-CurrentVersionCode: 58
+CurrentVersionCode: 64

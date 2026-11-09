@@ -5,7 +5,7 @@ The F-Droid build is **reproducible**: F-Droid builds the tagged release from so
 ## What is ready
 
 - **Listing:** `fastlane/metadata/android/en-US/` holds the title, short and full description and changelogs (named by version code); screenshots go in `images/phoneScreenshots/` once a fresh one is taken. The description says the Wear OS remote exists, is completely optional and is not part of the F-Droid build.
-- **Recipe:** `fdroid/io.github.levi2m.nanodash.yml`, the file in fdroiddata as `metadata/io.github.levi2m.nanodash.yml`. It builds release `v0.1.0-58` (version code 58) in `android/app`. `Binaries` points at that release's phone APK and `AllowedAPKSigningKeys` names our signing certificate (`b728abd0...97e3b4f2`).
+- **Recipe:** `fdroid/io.github.levi2m.nanodash.yml`, the file in fdroiddata as `metadata/io.github.levi2m.nanodash.yml`. It builds release `v0.1.0-64` (version code 64) in `android/app`. `Binaries` points at that release's phone APK and `AllowedAPKSigningKeys` names our signing certificate (`b728abd0...97e3b4f2`).
 - **In the app:** when an F-Droid client installed the app, the Settings sheet hides "Check for updates", because the F-Droid client already updates it.
 - **Licences:** the app is Apache-2.0. Its dependencies are AndroidX, Kotlin and Compose, all free software.
 
@@ -36,10 +36,11 @@ In WSL or Linux, with the Android SDK and JDK 21 installed:
 
 A local build skips the `sudo` step, so it uses the JDK already installed; F-Droid's build server runs it.
 
-## Results (fdroidserver 2.4.5, release v0.1.0-58)
+## Results (fdroidserver 2.4.5, release v0.1.0-64)
 
-- `fdroid rewritemeta` leaves the recipe unchanged and `fdroid lint` passes.
-- `fdroid build` builds `v0.1.0-58` (commit `143248c`) with Gradle 9.8.2 and JDK 21.0.13; the source scanner only removes `gradle-wrapper.jar`. It then downloads `nano-dash-v0.1.0-58.apk` from the GitHub release, copies its signature onto the rebuild and reports "compared built binary to supplied reference binary successfully" and "supplied reference binary has allowed signer b728abd0...". With the signature copied, the rebuild is byte-for-byte the GitHub APK.
-- The APK is version code 58, version 0.1.0, with no internet permission. The watch app is not built.
+- `fdroid lint` passes, and `fdroid rewritemeta` only differs by the `Binaries:` wrapping that fdroiddata's newer version applies (see Testing the recipe locally).
+- `fdroid build` builds `v0.1.0-64` (commit `0503b45`) with Gradle 9.8.2 and JDK 21.0.13; the source scanner only removes `gradle-wrapper.jar`. It then downloads `nano-dash-v0.1.0-64.apk` from the GitHub release, copies its signature onto the rebuild and reports "compared built binary to supplied reference binary successfully" and "supplied reference binary has allowed signer b728abd0...". With the signature copied, the rebuild is byte-for-byte the GitHub APK.
+- The APK is version code 64, version 0.1.0, with no internet permission. The watch app is not built.
 - Not tested: F-Droid's build server itself, whose JDK 21 comes from Debian and may differ in build from the one used here. If its rebuild does not match, F-Droid will not publish that version.
-- Release 58's tagged commit has no `changelogs/58.txt`, so that version shows no changelog in F-Droid.
+- Release 58 was rejected by fdroiddata's `check apk`: Android's build tools had added a Google Play "Dependency metadata" block to the signing data, which F-Droid's scanner refuses. `dependenciesInfo` in `android/app/build.gradle.kts` now switches it off; reading the APKs' signing blocks shows 58 with it and 64 without. fdroidserver 2.4.5 does not report the block, so this has to be checked by reading the signing block, or by the fork's pipeline.
+- Release 64's tagged commit has no `changelogs/64.txt`, so that version shows no changelog in F-Droid.
