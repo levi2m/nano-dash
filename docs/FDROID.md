@@ -32,7 +32,7 @@ In WSL or Linux, with the Android SDK and JDK 21 installed:
 3. `mkdir -p fdroiddata/metadata` (the sparse checkout has no such folder), copy the recipe there without its comment lines, and add to `fdroiddata/config.yml`: `sdk_path:` (the SDK), `java_paths:` with `21:` (the JDK folder; F-Droid clears `JAVA_HOME`), and `gradle:` pointing at F-Droid's launcher, `gradlew.py` from https://gitlab.com/fdroid/gradlew-fdroid (the pip package does not include it, and F-Droid deletes `gradle-wrapper.jar`, so our wrapper cannot run).
 4. Put the JDK's `bin` on `PATH`: the reproducibility check runs `apksigner`, which needs `java`, and fails with an empty error without it.
 5. Clone the app into `fdroiddata/build/io.github.levi2m.nanodash` first (fdroidserver 2.4.5 reads its commit date before cloning).
-6. In `fdroiddata/`: `fdroid rewritemeta io.github.levi2m.nanodash` (fdroiddata's CI rejects a file it would rewrite), `fdroid lint io.github.levi2m.nanodash`, then `fdroid build -v -l io.github.levi2m.nanodash`.
+6. In `fdroiddata/`: `fdroid rewritemeta io.github.levi2m.nanodash` (fdroiddata's CI rejects a file it would rewrite; its newer fdroidserver also wraps long lines such as `Binaries:`, which 2.4.5 does not), `fdroid lint io.github.levi2m.nanodash`, then `fdroid build -v -l io.github.levi2m.nanodash`.
 
 A local build skips the `sudo` step, so it uses the JDK already installed; F-Droid's build server runs it.
 
