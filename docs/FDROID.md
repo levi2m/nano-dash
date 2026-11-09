@@ -12,7 +12,7 @@ The F-Droid build is **reproducible**: F-Droid builds the tagged release from so
 ## Submission
 
 - Fork: https://gitlab.com/levi2m/fdroiddata, branch `io.github.levi2m.nanodash`, with the recipe committed.
-- The fork's pipeline needs GitLab's identity check on the maintainer's account before it runs.
+- The fork asks for GitLab's identity check before its pipeline runs. F-Droid says not to give GitLab a phone number or card: leave a note in the merge request and their team triggers the pipeline.
 - Next: the merge request to `fdroid/fdroiddata` ("New app: Nano Dash"), then the reviewers.
 
 ## Adding a release later
@@ -20,7 +20,7 @@ The F-Droid build is **reproducible**: F-Droid builds the tagged release from so
 Every push to `main` that touches `android/`, `scripts/` or the workflow makes a GitHub release, so F-Droid does not follow tags on its own (`UpdateCheckMode: None`). When a release is worth shipping on F-Droid:
 
 1. Optional: add `fastlane/metadata/android/en-US/changelogs/<N>.txt` (500 bytes at most) before the release, so it is in the tagged commit. `N` is the CI run number that will build it, which cannot be known for sure in advance (pull-request runs use numbers too), so a missing changelog is the usual case and is fine.
-2. In fdroiddata, add a `Builds` entry with `versionCode: N`, `commit: v0.1.0-N` and `versionCode=N` in `gradleprops`, and set `CurrentVersion` and `CurrentVersionCode`. `Binaries` needs no change: it is filled in from the version name and code.
+2. In fdroiddata, add a `Builds` entry with `versionCode: N`, `commit:` the full hash of tag `v0.1.0-N` (fdroiddata asks for a hash, not a tag) and `versionCode=N` in `gradleprops`, and set `CurrentVersion` and `CurrentVersionCode`. `Binaries` needs no change: it is filled in from the version name and code.
 3. Run `fdroid lint` and `fdroid build` (below). The build must end with "compared built binary to supplied reference binary successfully"; if it does not, the release is not reproducible and must not be submitted.
 
 ## Testing the recipe locally

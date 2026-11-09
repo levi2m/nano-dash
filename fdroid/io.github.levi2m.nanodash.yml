@@ -23,7 +23,7 @@ Binaries: https://github.com/levi2m/nano-dash/releases/download/v%v-%c/nano-dash
 Builds:
   - versionName: 0.1.0
     versionCode: 58
-    commit: v0.1.0-58
+    commit: 143248c47f3da127f730c23fd240528d3226454b
     subdir: android/app
     sudo:
       - apt-get update
