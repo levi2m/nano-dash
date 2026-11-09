@@ -1,11 +1,12 @@
 # Draft F-Droid build recipe for Nano Dash. It is NOT used by this repository's own build; it is the file to copy into
 # the F-Droid data repository (https://gitlab.com/fdroid/fdroiddata, as metadata/io.github.levi2m.nanodash.yml) when
-# opening the merge request. It has not been run through `fdroid build` yet: see docs/FDROID.md for how to test it.
+# opening the merge request. `fdroid lint` and `fdroid build` pass with it locally (docs/FDROID.md has the steps and results).
 # The version name is nanodash.versionName in android/gradle.properties (both apps read it there); keep `versionName` below equal to it.
 # The name, summary, description and screenshots come from fastlane/metadata/android/en-US in this repository.
 
 Categories:
   - Sports & Health
+  - Camera
 License: Apache-2.0
 AuthorName: levi2m
 WebSite: https://github.com/levi2m/nano-dash
@@ -21,7 +22,9 @@ Repo: https://github.com/levi2m/nano-dash.git
 Builds:
   - versionName: 0.1.0
     versionCode: 48
-    commit: v0.1.0-48
+    # A commit, not a tag: this commit carries changelogs/48.txt. No GitHub release has number 48 (that CI run checked a
+    # pull request), which is harmless, as the F-Droid APK is signed with F-Droid's key anyway.
+    commit: 295eadf1df878d1637a7ef88e5e1539ec7aaaf9e
     subdir: android/app
     # The project is built with JDK 21 (see android/core/build.gradle.kts); the build server may have an older one.
     sudo:
