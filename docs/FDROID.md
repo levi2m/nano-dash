@@ -4,8 +4,9 @@ F-Droid builds the app from source and signs it with its own key, so an F-Droid 
 
 ## What is ready in this repository
 
-- **Listing:** `fastlane/metadata/android/en-US/` holds the title, short and full description and a changelog (named by version code); screenshots go in `images/phoneScreenshots/` once a fresh one is taken. F-Droid reads them from here.
-- **Recipe draft:** `fdroid/io.github.levi2m.nanodash.yml`, to be copied into the F-Droid data repository. It has not been run through F-Droid's own build yet, and the merge request has not been filed. It builds only the phone app (`subdir: android/app`); the watch APK stays a GitHub-only download. It is pinned to build 35 (tag `v0.1.0-35`, which predates the `fastlane` folder, so the tag itself has no listing or changelog); the latest release is newer.
+- **Listing:** `fastlane/metadata/android/en-US/` holds the title, short and full description and a changelog (named by version code); screenshots go in `images/phoneScreenshots/` once a fresh one is taken. F-Droid reads them from here. The description says the Wear OS remote exists, is completely optional and is not part of the F-Droid build.
+- **Recipe:** `fdroid/io.github.levi2m.nanodash.yml`, to be copied into the F-Droid data repository. It builds only the phone app (`subdir: android/app`); the watch APK stays a GitHub-only download. It builds version code 48 from commit `295eadf`, which carries `changelogs/48.txt`. No GitHub release has number 48 (that CI run checked a pull request); that is harmless, as F-Droid signs with its own key. The merge request has not been filed.
+- **In the app:** when an F-Droid client installed the app, the Settings sheet hides "Check for updates", because F-Droid updates the app itself and a GitHub APK is signed with another key.
 - **Source checks that were run** (see the results at the end of this file): a fresh public clone builds the release APK with no signing key, the two builds can be compared, and the dependency list has no Google Play services, analytics or crash reporters.
 - **Licences:** the app is Apache-2.0. Its dependencies are AndroidX, Kotlin and Compose, all free software.
 
@@ -18,7 +19,31 @@ F-Droid builds the app from source and signs it with its own key, so an F-Droid 
 
 ## Updating later
 
-The recipe lists builds by hand. Every push to `main` creates a GitHub release, so tags are not a signal for F-Droid. When a build is worth shipping, add an entry with that release's version code and tag (also in `gradleprops`), and update `CurrentVersion` and `CurrentVersionCode`. Add `fastlane/metadata/android/en-US/changelogs/<version code>.txt` (500 bytes at most) in a commit that is already in that tag, so push the changelog before the release run that is meant to ship. Whether F-Droid reads the listing from the tag or from the default branch has not been checked. The listing text does not mention the watch remote yet; add it when the recipe moves past build 35.
+The recipe lists builds by hand. Every push to `main` that touches `android/`, `scripts/` or the workflow creates a GitHub release, so tags are not a signal for F-Droid. A docs-only push (`fastlane/`, `fdroid/`, `docs/`) makes no CI run and no release, and pull-request runs use up run numbers too, so the next run number cannot be predicted. That is why the recipe points at a commit hash, not a tag:
+
+1. Add `fastlane/metadata/android/en-US/changelogs/<N>.txt` (500 bytes at most) on `main`, with `N` higher than the last F-Droid version code and than any GitHub build a phone might have.
+2. Add a `Builds` entry with `versionCode: N`, `commit:` the full hash of a commit that has that changelog, and `versionCode=N` in `gradleprops`; set `CurrentVersion` and `CurrentVersionCode`.
+3. Run `fdroid lint` and `fdroid build` (below) before sending the change to fdroiddata.
+
+Whether F-Droid reads the listing from the built commit or from the default branch has not been checked.
+
+## Testing the recipe locally
+
+In WSL or Linux, with the Android SDK and JDK 21 installed:
+
+1. `pipx install fdroidserver`.
+2. A sparse clone of fdroiddata with only its `config/` folder (lint needs its category list and icons): `git clone --depth 1 --filter=blob:none --sparse https://gitlab.com/fdroid/fdroiddata.git && git -C fdroiddata sparse-checkout set config`.
+3. `mkdir -p fdroiddata/metadata` (the sparse checkout has no such folder), copy the recipe there, and add to `fdroiddata/config.yml`: `sdk_path:` (the SDK), `java_paths:` with `21:` (the JDK folder; F-Droid clears `JAVA_HOME`), and `gradle:` pointing at F-Droid's launcher, `gradlew.py` from https://gitlab.com/fdroid/gradlew-fdroid (the pip package does not include it, and F-Droid deletes `gradle-wrapper.jar`, so our wrapper cannot run).
+4. Clone the app into `fdroiddata/build/io.github.levi2m.nanodash` first (fdroidserver 2.4.5 reads its commit date before cloning).
+5. In `fdroiddata/`: `fdroid lint io.github.levi2m.nanodash`, then `fdroid build -v -l io.github.levi2m.nanodash`.
+
+A local build skips the `sudo` step, so it uses the JDK already installed; F-Droid's build server runs it.
+
+## Results of the recipe test (version code 48, commit 295eadf)
+
+- `fdroid lint` passes (fdroidserver 2.4.5, categories from fdroiddata).
+- `fdroid build` succeeds: the source scanner only removes `gradle-wrapper.jar`, as it always does, and Gradle 9.8.2 with JDK 21 builds `io.github.levi2m.nanodash_48.apk` (1.1 MB, unsigned), version code 48, version 0.1.0, with no internet permission. The watch app is not built.
+- Not tested: the `sudo` step that installs JDK 21 on F-Droid's build server, and F-Droid's reproducibility check against our signed APK (not used: F-Droid signs with its own key).
 
 ## Results of the source checks (commit 4aa1a34, version code 34)
 
