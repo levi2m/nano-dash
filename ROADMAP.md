@@ -20,7 +20,7 @@ Nano Dash works end to end on one Osmo Nano and one phone. This lists what is pr
 4. **The merge tool**, undecided: first check on a ride whether Mimo's lean and G widgets already work from the clip's own sensors. If they do, drop it. If not, combine the camera's orientation and acceleration (the clip's `djmd` track) with the phone's GPS into one `.fit`, keeping the GPS estimate as the fallback.
 5. **Two cameras on a real ride:** connection order, Android's limit on parallel Bluetooth links, and a second camera's pairing. Waits for someone with two Nanos to file a compatibility report.
 6. **Robustness, what is left:** a first-run battery-optimisation prompt, only if the long ride shows a need.
-7. **Supply chain:** Gradle dependency verification is not set up yet; dependencies are pinned by version but not checked by hash.
+7. **Supply chain:** Gradle checks every downloaded library and plugin against a SHA-256 in `android/gradle/verification-metadata.xml`. Left: signature (PGP) checks, only if a concrete need appears.
 8. **Engineering:** nothing planned. Split `LoggerService` or add a ViewModel only if a concrete problem appears.
 
 ## Possible later
