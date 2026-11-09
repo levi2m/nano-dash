@@ -33,7 +33,7 @@ In WSL or Linux, with the Android SDK and JDK 21 installed:
 
 1. `pipx install fdroidserver`.
 2. A sparse clone of fdroiddata with only its `config/` folder (lint needs its category list and icons): `git clone --depth 1 --filter=blob:none --sparse https://gitlab.com/fdroid/fdroiddata.git && git -C fdroiddata sparse-checkout set config`.
-3. Copy the recipe to `fdroiddata/metadata/`, and add to `fdroiddata/config.yml`: `sdk_path:` (the SDK), `java_paths:` with `21:` (the JDK folder; F-Droid clears `JAVA_HOME`), and `gradle:` pointing at F-Droid's launcher, `gradlew.py` from https://gitlab.com/fdroid/gradlew-fdroid (the pip package does not include it, and F-Droid deletes `gradle-wrapper.jar`, so our wrapper cannot run).
+3. `mkdir -p fdroiddata/metadata` (the sparse checkout has no such folder), copy the recipe there, and add to `fdroiddata/config.yml`: `sdk_path:` (the SDK), `java_paths:` with `21:` (the JDK folder; F-Droid clears `JAVA_HOME`), and `gradle:` pointing at F-Droid's launcher, `gradlew.py` from https://gitlab.com/fdroid/gradlew-fdroid (the pip package does not include it, and F-Droid deletes `gradle-wrapper.jar`, so our wrapper cannot run).
 4. Clone the app into `fdroiddata/build/io.github.levi2m.nanodash` first (fdroidserver 2.4.5 reads its commit date before cloning).
 5. In `fdroiddata/`: `fdroid lint io.github.levi2m.nanodash`, then `fdroid build -v -l io.github.levi2m.nanodash`.
 
