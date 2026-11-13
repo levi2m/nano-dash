@@ -13,7 +13,9 @@ The F-Droid build is **reproducible**: F-Droid builds the tagged release from so
 
 - Fork: https://gitlab.com/levi2m/fdroiddata, branch `io.github.levi2m.nanodash`, with the recipe committed.
 - The fork asks for GitLab's identity check before its pipeline runs. F-Droid says not to give GitLab a phone number or card: leave a note in the merge request and their team triggers the pipeline.
-- Next: the merge request to `fdroid/fdroiddata` ("New app: Nano Dash"), then the reviewers.
+- Merge request [fdroid/fdroiddata!56398](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/56398), opened 9 November 2026. Its pipeline passed every job for version code 64, including `check apk` and the reproducible `fdroid build`.
+- **Closed without merging the same day** by an F-Droid reviewer: "This app doesn't meet the policy that it needs to be maintained for more than 3 months." The repository is public since 3 November 2026. Nothing else in the recipe was questioned.
+- **Resubmit from 3 February 2027:** move the recipe to the latest release (see Adding a release later), rerun the local test, push to the fork's `io.github.levi2m.nanodash` branch and reopen the merge request or open a new one. Until then, install from GitHub releases; as the build is reproducible with our key, those installs can take F-Droid updates later.
 
 ## Adding a release later
 
