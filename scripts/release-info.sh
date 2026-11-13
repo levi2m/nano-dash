@@ -40,7 +40,8 @@ for apk in "$@"; do
   out=$("$apksigner" verify --print-certs "$apk" 2>&1 || true)
   cert=$(printf '%s\n' "$out" | grep -i "certificate SHA-256 digest" | head -1 | sed "s/.*: *//")
   [ -n "$cert" ] || { echo "could not read the signing certificate of $apk (apksigner: $apksigner)" >&2; printf '%s\n' "$out" | head -8 >&2; exit 1; }
-  if signing_block_ids "$apk" | grep -qx 0x504b4453; then
+  ids=$(signing_block_ids "$apk")   # a parser error stops the script here (set -e) instead of reading as "no block"
+  if printf '%s\n' "$ids" | grep -qx 0x504b4453; then
     echo "$apk carries Google Play's Dependency metadata block; F-Droid rejects it (set dependenciesInfo off in its build file)" >&2
     exit 1
   fi
