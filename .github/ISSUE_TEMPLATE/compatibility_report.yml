@@ -20,7 +20,7 @@ body:
     id: app
     attributes:
       label: App version (release tag, or the build number at the bottom of the app)
-      placeholder: "v0.1.0-46"
+      placeholder: "v0.1.0-69"
     validations:
       required: true
   - type: dropdown
@@ -39,3 +39,9 @@ body:
     attributes:
       label: Notes
       description: "Ride length, screen off or on, more than one camera. Attach meta.json and events.jsonl from the ride folder if you can; leave out gnss.csv if you do not want to share your route. These files hold no coordinates, but they do show your phone model, the exact ride times and the last five characters of the camera address."
+  - type: textarea
+    id: watch
+    attributes:
+      label: Watch (optional)
+      description: "If you have a smartwatch: its model and firmware. Garmin owners: turn on Settings, Quick start from the watch, then tell us whether the Nano Dash notifications (Ready with Start ride, and Stop during a ride) show on the watch and whether the buttons work. See docs/GARMIN.md."
+      placeholder: "Garmin Fenix 8, firmware 15.20: Ready notification shows, Start asks to unlock the phone, Stop works"
