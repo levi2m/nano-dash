@@ -5,6 +5,12 @@ on:
     branches: [main]   # pull requests are checked by the pull_request trigger
     paths: [android/**, .github/workflows/**, scripts/**]   # docs-only pushes need no build or release
   pull_request:
+    paths: [android/**, .github/workflows/**, scripts/**]   # docs-only pull requests need no build either; keep "test" a non-required check
+
+# A newer push to the same pull request cancels the older check. Pushes to main are never cancelled, so no release is lost.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -33,11 +39,12 @@ jobs:
       - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       - name: Test, lint and build
-        run: ./gradlew :core:test :app:lintDebug :wear:lintDebug :app:assembleDebug :app:assembleRelease :wear:assembleRelease --console=plain
+        run: ./gradlew :core:test :app:lintDebug :wear:lintDebug :app:assembleRelease :wear:assembleRelease --console=plain
       - name: Shipped manifests have no INTERNET permission
         run: bash ../scripts/check-no-internet.sh
 
   # Holds the signing key, with a read-only token, and only on a push to main after the tests passed. It publishes nothing itself.
+  # It builds the release again on purpose (about 1.5 minutes): the key never reaches the job that runs tests and project checks.
   build:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
