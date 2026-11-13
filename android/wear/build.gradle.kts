@@ -40,6 +40,12 @@ android {
         }
     }
 
+    // Leaves out Google Play's encrypted dependency list, as the phone app does; scripts/release-info.sh rejects it.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildFeatures {
         compose = true
     }

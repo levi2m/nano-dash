@@ -702,7 +702,7 @@ internal object BuildConfigInfo {
     fun versionName(context: Context): String =
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "unknown"
 
-    /** True when an F-Droid client installed the app: it updates the app itself, and a GitHub APK is signed with another key. */
+    /** True when an F-Droid client installed the app: that client updates it, so the GitHub update link is not needed. */
     @Suppress("DEPRECATION") // getInstallSourceInfo needs API 30, minSdk is 26
     fun fromFDroid(context: Context): Boolean {
         val installer = runCatching { context.packageManager.getInstallerPackageName(context.packageName) }.getOrNull() ?: return false
