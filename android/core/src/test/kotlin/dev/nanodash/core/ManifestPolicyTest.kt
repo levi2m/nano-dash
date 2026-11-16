@@ -24,7 +24,7 @@ class ManifestPolicyTest {
 
     private fun exportedComponents(doc: org.w3c.dom.Document): Map<String, String> {
         val exported = mutableMapOf<String, String>()
-        for (tag in listOf("activity", "service", "receiver", "provider")) {
+        for (tag in listOf("activity", "activity-alias", "service", "receiver", "provider")) {
             val nodes = doc.getElementsByTagName(tag)
             for (i in 0 until nodes.length) {
                 val attrs = nodes.item(i).attributes
@@ -48,9 +48,25 @@ class ManifestPolicyTest {
     fun theWatchAppHasNoNetworkPermissionAndNoBackup() = assertNoNetworkNoBackup(parse(File(wear, "AndroidManifest.xml")))
 
     @Test
-    fun onlyTheLauncherActivityIsExported() {
+    fun onlyTheLauncherAndTheSystemOnlyHealthEntryAreExported() {
         val doc = parse(File(main, "AndroidManifest.xml"))
-        assertEquals(mapOf(".MainActivity" to "true", ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false"), exportedComponents(doc))
+        assertEquals(
+            mapOf(
+                ".MainActivity" to "true", ".HealthRationaleActivity" to "false", ".ViewPermissionUsageActivity" to "true",
+                ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false",
+            ),
+            exportedComponents(doc),
+        )
+        // Android 14's entry for the same screen can be started only by the system.
+        val alias = doc.getElementsByTagName("activity-alias").item(0).attributes
+        assertEquals("android.permission.START_VIEW_PERMISSION_USAGE", alias.getNamedItemNS(androidNs, "permission").nodeValue)
+        assertEquals(".HealthRationaleActivity", alias.getNamedItemNS(androidNs, "targetActivity").nodeValue)
+    }
+
+    @Test
+    fun theAppReadsHeartRateAndNothingElseFromHealthConnect() {
+        val health = permissions(parse(File(main, "AndroidManifest.xml"))).filter { it.startsWith("android.permission.health.") }
+        assertEquals(listOf("android.permission.health.READ_HEART_RATE"), health)
     }
 
     @Test

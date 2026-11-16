@@ -46,6 +46,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,10 +85,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.nanodash.logger.BuildConfigInfo
 import dev.nanodash.logger.CameraController
 import dev.nanodash.logger.CameraUi
+import dev.nanodash.logger.HealthConnectReader
 import dev.nanodash.logger.LoggerService
 import dev.nanodash.logger.Note
 import dev.nanodash.logger.RideFiles
 import dev.nanodash.logger.RideStore
+import dev.nanodash.core.ride.HealthCsv
+import dev.nanodash.core.ride.HealthImport
 import dev.nanodash.core.ride.RideFolder
 import dev.nanodash.core.ride.RideSummary
 import dev.nanodash.core.ride.SpeedUnit
@@ -110,9 +114,14 @@ import dev.nanodash.logger.ui.theme.nanoColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
+
+/** How far outside the first and last GPS fix to look for heart rate, so a reading just before Start or after Stop is not missed. */
+private const val HEALTH_WINDOW_MARGIN_MS = 10_000L
 
 @Composable
 fun LoggerScreen() {
@@ -131,8 +140,10 @@ fun LoggerScreen() {
     var unit by remember { mutableStateOf(SpeedUnit.saved(prefs.getString("speed_unit", null)) ?: SpeedUnit.forCountry(region)) }
     // Location can be switched off, or permission revoked, while the app is in the background, so look again every time it returns.
     var gps by remember { mutableStateOf(GpsReadiness.Ready) }
+    var resumes by remember { mutableIntStateOf(0) }   // the automatic heart-rate pass runs once per return to the app
     LifecycleResumeEffect(Unit) {
         gps = gpsReadiness(context)
+        resumes++
         onPauseOrDispose { }
     }
 
@@ -150,6 +161,66 @@ fun LoggerScreen() {
         }
     }
     LaunchedEffect(ui.recording, ui.message) { reload() }
+
+    // Heart rate from Health Connect (Android 14 and later): read what the watch recorded during the ride and rebuild the .fit with it.
+    val healthAvailable = remember { HealthConnectReader.available(context) }
+    // What happened to the health data of one ride, shown on that ride's card (a message at the top of the screen is out of sight when the rider taps a button further down).
+    var healthNote by remember { mutableStateOf<Pair<String, String>?>(null) }
+    fun note(ride: RideSummary, text: String) { healthNote = ride.dir.name to text }
+    // One import at a time: two of them on the same ride would write the same temporary files (a tap during the automatic pass, or the pass restarting).
+    val healthLock = remember { Mutex() }
+    /** [manual] is a tap on the button: it explains an empty result. The automatic pass stays quiet and tries again next time. Returns true when readings were added. */
+    suspend fun importHeartRate(ride: RideSummary, manual: Boolean = true): Boolean = healthLock.withLock {
+        try {
+            val window = withContext(Dispatchers.IO) { RideFolder.fixWindow(ride.dir, HEALTH_WINDOW_MARGIN_MS) }
+            if (window == null) { if (manual) note(ride, "This track has no GPS fixes, so there is no time range to look up."); return@withLock false }
+            val readings = HealthCsv.clean(HealthConnectReader.readHeartRate(context, window.first, window.second))
+            if (readings.isEmpty()) {
+                if (manual) note(ride, "No heart rate in Health Connect for this track. Did the watch workout sync to Health Connect, and was it recorded after you gave Nano Dash access?")
+                return@withLock false
+            }
+            val rebuilt = withContext(Dispatchers.IO) { RideFolder.saveHealth(ride.dir, readings); RideFolder.rebuildFit(ride.dir) }
+            if (!rebuilt) { note(ride, "The heart rate was saved but the .fit could not be rebuilt."); return@withLock false }
+            note(ride, "Added ${readings.size} heart-rate readings to the .fit.")
+            return@withLock true
+        } catch (e: IOException) {
+            if (manual) note(ride, "Could not save the heart rate. Is the phone full?")
+        } catch (e: SecurityException) {
+            if (manual) { note(ride, "Health Connect did not allow reading heart rate. Allow Nano Dash there."); HealthConnectReader.openSettings(context) }
+        } catch (e: RuntimeException) {   // HealthConnectException is one; not named here so phones older than Android 14 never load it
+            if (manual) note(ride, "Health Connect could not be read: ${e.message ?: "unknown error"}")
+        }
+        false
+    }
+    // The automatic pass: once Health Connect access is given, a recent ride with no heart rate yet gets it when the app is open, with no tap.
+    // The watch may sync late, so a ride that found nothing is tried again on the next return to the app and after the next ride, until it is older than HealthImport.DAYS.
+    // It uses the list the screen already loaded, so it waits for that list (the key below flips from false to true) instead of reading every ride again.
+    val ridesLoaded = rides != null
+    LaunchedEffect(resumes, ui.recording, ui.saving, ridesLoaded) {
+        val list = rides ?: return@LaunchedEffect
+        if (!healthAvailable || ui.recording || ui.saving || !HealthConnectReader.granted(context)) return@LaunchedEffect
+        val due = HealthImport.due(list, System.currentTimeMillis())
+        var added = false
+        for (ride in due) if (importHeartRate(ride, manual = false)) added = true
+        if (added) reload()
+    }
+    var healthRide by remember { mutableStateOf<RideSummary?>(null) }
+    val healthPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        val ride = healthRide
+        healthRide = null
+        if (ride == null) return@rememberLauncherForActivityResult
+        if (ok) scope.launch { importHeartRate(ride); reload() }
+        else {
+            // Android's own request can be skipped without a word (for example after two refusals), so go to the app's page in Health Connect, where it can always be allowed.
+            note(ride, "Allow Nano Dash to read heart rate in Health Connect, then come back and tap again.")
+            HealthConnectReader.openSettings(context)
+        }
+    }
+    fun addHeartRate(ride: RideSummary) {
+        note(ride, "Looking in Health Connect…")
+        if (HealthConnectReader.granted(context)) scope.launch { importHeartRate(ride); reload() }
+        else { healthRide = ride; healthPermission.launch(HealthConnectReader.PERMISSION) }
+    }
     // With quick start on, the service is armed whenever the app is on screen: Android only lets it start from the foreground.
     LaunchedEffect(Unit) { LoggerService.arm(context) }
     LaunchedEffect(ui.recording) {
@@ -204,7 +275,7 @@ fun LoggerScreen() {
 
     val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) LoggerService.start(context)
-        else RideStore.update { it.copy(message = Note("Precise location permission is needed to log a ride.", needsSettings = true)) }
+        else RideStore.update { it.copy(message = Note("Precise location permission is needed to log a track.", needsSettings = true)) }
     }
     val bluetoothPermissions = remember {
         if (Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT) else emptyArray()
@@ -259,11 +330,11 @@ fun LoggerScreen() {
                 )
             }
         }
-        item { SectionLabel("Rides", Modifier.padding(top = Space.s)) }
+        item { SectionLabel("Tracks", Modifier.padding(top = Space.s)) }
         // The ride being recorded is the newest folder; it has no result yet, so it joins the list when it stops.
         val list = rides?.let { if (ui.recording) it.drop(1) else it }
         when {
-            list == null -> item { Notice("Loading rides") }
+            list == null -> item { Notice("Loading tracks") }
             list.isEmpty() -> item { EmptyRides() }
             else -> {
                 // Old rides with no GPS and no .fit are test runs: fold them away, but always show the newest ride,
@@ -298,15 +369,17 @@ fun LoggerScreen() {
                             }
                         },
                         onDelete = { confirmDelete = ride },
+                        onAddHeartRate = if (healthAvailable && ride.hasFit && !ui.recording) ({ addHeartRate(ride) }) else null,
+                        healthNote = healthNote?.takeIf { it.first == ride.dir.name }?.second,
                     )
                 }
                 if (!ui.recording) {
                     item {
                         NanoButton(
-                            "Export all rides (${list.size})",
+                            "Export all tracks (${list.size})",
                             {
                                 scope.launch {
-                                    val zip = java.io.File(RideFiles.exports(context), "nano-dash-rides.zip")
+                                    val zip = java.io.File(RideFiles.exports(context), "nano-dash-tracks.zip")
                                     val ok = try {
                                         withContext(Dispatchers.IO) {
                                             try {
@@ -334,7 +407,7 @@ fun LoggerScreen() {
                 if (folded.isNotEmpty()) {
                     item {
                         NanoButton(
-                            if (showFolded) "Hide rides without GPS" else "Show ${folded.size} ${if (folded.size == 1) "ride" else "rides"} without GPS",
+                            if (showFolded) "Hide tracks without GPS" else "Show ${folded.size} ${if (folded.size == 1) "track" else "tracks"} without GPS",
                             { showFolded = !showFolded },
                             Modifier.fillMaxWidth(),
                             ButtonKind.Quiet,
@@ -457,7 +530,7 @@ fun LoggerScreen() {
                     Text("No paired devices were found. Pair your watch with this phone first.", style = NanoText.body, color = c.textSecondary)
                 } else {
                     Column {
-                        Text("Only this device can start and stop rides.", style = NanoText.body, color = c.textSecondary)
+                        Text("Only this device can start and stop tracks.", style = NanoText.body, color = c.textSecondary)
                         devices.forEach { (name, address) ->
                             TextButton(
                                 onClick = { LoggerService.setWatch(context, address, name); watchName = name; chooseWatch = false },
@@ -476,7 +549,7 @@ fun LoggerScreen() {
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
             containerColor = c.card,
-            title = { Text("Delete this ride?", style = NanoText.heading, color = c.text) },
+            title = { Text("Delete this track?", style = NanoText.heading, color = c.text) },
             text = { Text("Its GPS, motion and camera timing files are removed from this phone. Copies you already shared are not affected.", style = NanoText.body, color = c.textSecondary) },
             confirmButton = {
                 TextButton(onClick = {
@@ -495,7 +568,7 @@ private fun Header(onSettings: () -> Unit) {
         RouteMark(Modifier.size(40.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             Text("Nano Dash", Modifier.semantics { heading() }, style = NanoText.title, color = nanoColors.text)
-            Text("Ride logger for the Osmo Nano", style = NanoText.label, color = nanoColors.textMuted)
+            Text("Track logger for the Osmo Nano", style = NanoText.label, color = nanoColors.textMuted)
         }
         TextButton(onSettings, Modifier.heightIn(min = 48.dp)) { Text("Settings", style = NanoText.button, color = nanoColors.text) }
     }
@@ -544,12 +617,12 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadine
             val s = ((now - ui.startedUtcMillis) / 1000).coerceAtLeast(0)
             Text(
                 "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60),
-                Modifier.semantics { contentDescription = "Riding for ${WatchFormat.spoken(s)}" },
+                Modifier.semantics { contentDescription = "Recording for ${WatchFormat.spoken(s)}" },
                 style = NanoText.figure, color = c.text,
             )
         } else {
             Text("Ready", Modifier.semantics { heading() }, style = NanoText.title, color = c.text)
-            Notice("Start a ride to log GPS and motion. The camera starts with it when it is connected.")
+            Notice("Start a track to log GPS and motion. The camera starts with it when it is connected.")
         }
         Hairline()
         Column {
@@ -580,7 +653,7 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadine
         }
         StatusRow(if (many) "Cameras" else "Camera", camValue, camHealth)
         val (motionValue, motionHealth) = when {
-            !ui.recording -> "Starts with the ride" to Health.Off
+            !ui.recording -> "Starts with the track" to Health.Off
             ui.imuSamples == 0L -> "Waiting for the first sample" to Health.Wait
             else -> "Logging, ${"%,d".format(ui.imuSamples)} samples" to Health.Ok
         }
@@ -593,9 +666,9 @@ private fun RidePanel(ui: RideUiState, cam: CameraUi, now: Long, gps: GpsReadine
 private fun ActionArea(ui: RideUiState, cam: CameraUi, onStart: () -> Unit, onStop: () -> Unit, onOpenSettings: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
         if (ui.recording) {
-            NanoButton("Stop ride", onStop, Modifier.fillMaxWidth(), ButtonKind.Danger, height = 72.dp)
+            NanoButton("Stop tracking", onStop, Modifier.fillMaxWidth(), ButtonKind.Danger, height = 72.dp)
         } else {
-            NanoButton("Start ride", onStart, Modifier.fillMaxWidth(), ButtonKind.Primary, height = 72.dp, enabled = !ui.saving)
+            NanoButton("Start tracking", onStart, Modifier.fillMaxWidth(), ButtonKind.Primary, height = 72.dp, enabled = !ui.saving)
         }
         // The camera panel below says when no camera is ready, so only the result of the last action is repeated here.
         ui.cameraNote?.let { Notice(it.text, health = if (it.problem) Health.Wait else Health.Off) }
@@ -653,8 +726,8 @@ private fun CameraPanel(
         }
         val approve = cam.text.startsWith("Approve")
         val shown = when {
-            cam.ready -> if (cam.rows.size > 1) "All ready to start and stop with the ride" else "Ready to start and stop with the ride"
-            cam.text == "Camera not connected" -> "No camera is connected, so a ride now would have no video. Turn the camera on, make sure wireless connection is enabled on it, close Mimo on the phone, then connect."
+            cam.ready -> if (cam.rows.size > 1) "All ready to start and stop with the track" else "Ready to start and stop with the track"
+            cam.text == "Camera not connected" -> "No camera is connected, so a track now would have no video. Turn the camera on, make sure wireless connection is enabled on it, close Mimo on the phone, then connect."
             else -> caption(cam.text)
         }
         Text(
@@ -718,7 +791,7 @@ private fun CameraPicker(cam: CameraUi, onToggle: (String) -> Unit, onConnectSel
             NanoButton("Search again", onSearchAgain, Modifier.fillMaxWidth(), ButtonKind.Secondary)
         }
         else -> {
-            Text("Tick every camera that should record with the ride.", style = NanoText.body, color = c.textSecondary)
+            Text("Tick every camera that should record with the track.", style = NanoText.body, color = c.textSecondary)
             Column {
                 cam.found.forEach { address ->
                     val checked = address in cam.selected
@@ -746,13 +819,13 @@ private fun CameraPicker(cam: CameraUi, onToggle: (String) -> Unit, onConnectSel
 @Composable
 private fun EmptyRides() {
     Panel {
-        Text("No rides yet", Modifier.semantics { heading() }, style = NanoText.heading, color = nanoColors.text)
-        Notice("1. Connect the camera if you have it with you.\n2. Start the ride before you move off.\n3. Stop it when you arrive, then share the .fit file and import it in Mimo together with the clip.")
+        Text("No tracks yet", Modifier.semantics { heading() }, style = NanoText.heading, color = nanoColors.text)
+        Notice("1. Connect the camera if you have it with you.\n2. Start the track before you move off.\n3. Stop it when you arrive, then share the .fit file and import it in Mimo together with the clip.")
     }
 }
 
 @Composable
-private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onOpenRoute: () -> Unit, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit) {
+private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onOpenRoute: () -> Unit, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit, onAddHeartRate: (() -> Unit)?, healthNote: String?) {
     val c = nanoColors
     val locale = LocalConfiguration.current.locales[0]
     // The quiet Delete button is 48 dp tall with its label centred, so the card needs less bottom padding than the others.
@@ -770,7 +843,7 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onO
                 ride.route,
                 Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(Radius.small)).background(c.raised)
                     .clickable(onClickLabel = "Open the route in a maps app", role = Role.Button, onClick = onOpenRoute)
-                    .semantics { contentDescription = "Route of the ride, drawn from ${ride.fixes} GPS fixes" },
+                    .semantics { contentDescription = "Route of the track, drawn from ${ride.fixes} GPS fixes" },
             )
             Text("Tap the route to open it in a maps app", style = NanoText.label, color = c.textMuted)
         }
@@ -782,6 +855,9 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onO
             ride.longestGapSeconds?.takeIf { it >= 10 }?.let { Fact("Longest GPS gap", clock(it)) }
             ride.cameraClipSeconds.forEachIndexed { i, s ->
                 Fact(if (ride.cameraClipSeconds.size == 1) "Camera clip" else "Camera ${i + 1} clip", "%.1f s".format(s))
+            }
+            if (ride.heartRateReadings > 0) {
+                Fact("Heart rate readings", ride.heartRateReadings.toString())
             }
         }
 
@@ -806,8 +882,14 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onO
                 else -> NanoButton("Share raw files", onShareAll, Modifier.weight(1f), ButtonKind.Secondary, height = 48.dp)
             }
         }
+        healthNote?.let { Notice(it) }
+        if (onAddHeartRate != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalAlignment = Alignment.CenterVertically) {
+                NanoButton(if (ride.heartRateReadings > 0) "Update health data" else "Add health data", onAddHeartRate, Modifier.weight(1f), ButtonKind.Secondary, height = 48.dp)
+            }
+        }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-            NanoButton("Delete ride", onDelete, kind = ButtonKind.QuietDanger, height = 48.dp)
+            NanoButton("Delete track", onDelete, kind = ButtonKind.QuietDanger, height = 48.dp)
         }
     }
 }
@@ -843,7 +925,7 @@ private fun share(context: Context, files: List<java.io.File>) {
         if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0]) else putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, "Share ride").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    context.startActivity(Intent.createChooser(intent, "Share track").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 /** The devices already paired with this phone, by name, for choosing which one is the watch. */

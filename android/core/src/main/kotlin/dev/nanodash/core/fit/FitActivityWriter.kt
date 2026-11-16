@@ -14,6 +14,8 @@ data class RideSample(
     val leanAngleDeg: Float? = null,
     val lateralAccelMps2: Float? = null,
     val longitudinalAccelMps2: Float? = null,
+    /** From a watch or strap via Health Connect, matched by time. Null when there was no reading close enough. */
+    val heartRateBpm: Int? = null,
 )
 
 /** A span during which the camera was recording, in phone UTC. The .fit marks records inside it with `camera_recording = 1`. */
@@ -34,6 +36,9 @@ class FitActivityWriter {
     fun encode(samples: List<RideSample>, cameraSpans: List<CameraSpan> = emptyList()): ByteArray {
         require(samples.isNotEmpty()) { "no samples" }
         val sorted = samples.sortedBy { it.utcMillis }
+        // The heart_rate field is declared only when the ride has readings, so a ride without health data keeps the file it always had.
+        val heartRates = sorted.mapNotNull { it.heartRateBpm }
+        val hasHeartRate = heartRates.isNotEmpty()
         val first = sorted.first()
         val last = sorted.last()
         val start = FitTime.fromUtcMillis(first.utcMillis)
@@ -63,7 +68,7 @@ class FitActivityWriter {
             listOf(
                 Field(253, 4, BT_UINT32), Field(0, 4, BT_SINT32), Field(1, 4, BT_SINT32), Field(2, 2, BT_UINT16), Field(5, 4, BT_UINT32),
                 Field(6, 2, BT_UINT16), Field(9, 2, BT_SINT16), Field(73, 4, BT_UINT32), Field(78, 4, BT_UINT32),
-            ),
+            ) + (if (hasHeartRate) listOf(Field(3, 1, BT_UINT8)) else emptyList()),   // heart_rate, bpm
             devFields = listOf(DevField(0, 4, 0), DevField(1, 4, 0), DevField(2, 4, 0), DevField(3, 1, 0)),
         )
         for ((i, s) in sorted.withIndex()) {
@@ -83,6 +88,7 @@ class FitActivityWriter {
                 s16((grade.coerceIn(-100f, 100f) * 100f).roundToInt())
                 u32((s.speedMps * 1000.0).roundToLong().coerceIn(0, 0xFFFF_FFFEL))
                 u32(((s.altitudeM + 500.0) * 5.0).roundToLong().coerceIn(0, 0xFFFF_FFFEL))
+                if (hasHeartRate) u8(s.heartRateBpm?.coerceIn(1, 254) ?: FIT_UINT8_INVALID)
                 f32(s.leanAngleDeg)
                 f32(s.lateralAccelMps2)
                 f32(s.longitudinalAccelMps2)
@@ -98,7 +104,7 @@ class FitActivityWriter {
             listOf(
                 Field(254, 2, BT_UINT16), Field(253, 4, BT_UINT32), Field(2, 4, BT_UINT32), Field(7, 4, BT_UINT32), Field(8, 4, BT_UINT32),
                 Field(9, 4, BT_UINT32), Field(5, 1, BT_ENUM), Field(6, 1, BT_ENUM), Field(124, 4, BT_UINT32), Field(125, 4, BT_UINT32),
-            ),
+            ) + (if (hasHeartRate) listOf(Field(16, 1, BT_UINT8), Field(17, 1, BT_UINT8)) else emptyList()),   // avg_heart_rate, max_heart_rate
         )
         w.data(L_SESSION) {
             u16(0); u32(end); u32(start); u32(elapsedMs); u32(elapsedMs)
@@ -106,6 +112,7 @@ class FitActivityWriter {
             u8(SPORT_MOTORCYCLING); u8(SUB_SPORT_GENERIC)
             u32((avgSpeed * 1000.0).roundToLong().coerceIn(0, 0xFFFF_FFFEL))
             u32((maxSpeed * 1000.0).roundToLong().coerceIn(0, 0xFFFF_FFFEL))
+            if (hasHeartRate) { u8(heartRates.average().roundToInt().coerceIn(1, 254)); u8(heartRates.max().coerceIn(1, 254)) }
         }
 
         // activity
@@ -141,6 +148,7 @@ class FitActivityWriter {
         private const val MANUFACTURER_DEVELOPMENT = 255
         private const val SPORT_MOTORCYCLING = 22
         private const val SUB_SPORT_GENERIC = 0
+        private const val FIT_UINT8_INVALID = 0xFF
         private const val ACTIVITY_TYPE_MANUAL = 0
         private const val EVENT_ACTIVITY = 26
         private const val EVENT_TYPE_STOP = 1
