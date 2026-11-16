@@ -47,21 +47,21 @@ class NanoColors(
 )
 
 val DarkColors = NanoColors(
-    bg = Color(0xFF141415), card = Color(0xFF19191B), raised = Color(Palette.RAISED), hairline = Color(0x14EDEDED),
+    bg = Color(Palette.BG), card = Color(Palette.CARD), raised = Color(Palette.RAISED), hairline = Color(Palette.HAIRLINE),
     text = Color(Palette.TEXT), textSecondary = Color(Palette.TEXT_SECONDARY), textMuted = Color(Palette.TEXT_MUTED),
-    accent = Color(Palette.ACCENT), onAccent = Color(0xFF141415), accentText = Color(Palette.ACCENT),
-    fill = Color(Palette.ACCENT), onFill = Color(0xFF141415),
-    danger = Color(0xFFC62E33), onDanger = Color(0xFFFFFFFF),
+    accent = Color(Palette.ACCENT), onAccent = Color(Palette.ON_ACCENT_PHONE), accentText = Color(Palette.ACCENT),
+    fill = Color(Palette.ACCENT), onFill = Color(Palette.ON_ACCENT_PHONE),
+    danger = Color(Palette.DANGER), onDanger = Color(Palette.ON_DANGER),
     ok = Color(Palette.OK), warn = Color(Palette.WARN), bad = Color(Palette.BAD),
 )
 
 val LightColors = NanoColors(
     bg = Color(0xFFFAFAFA), card = Color(0xFFFFFFFF), raised = Color(0xFFF4F4F5), hairline = Color(0x14171717),
     text = Color(0xFF171717), textSecondary = Color(0xFF525252), textMuted = Color(0xFF737373),
-    accent = Color(Palette.ACCENT), onAccent = Color(0xFF141415), accentText = Color(0xFFB53A00),
+    accent = Color(Palette.ACCENT), onAccent = Color(Palette.ON_ACCENT_PHONE), accentText = Color(0xFFB53A00),
     fill = Color(0xFFB53A00), onFill = Color(0xFFFFFFFF),
-    danger = Color(0xFFC62E33), onDanger = Color(0xFFFFFFFF),
-    ok = Color(0xFF15803D), warn = Color(0xFF8A6100), bad = Color(0xFFC62E33),
+    danger = Color(Palette.DANGER), onDanger = Color(Palette.ON_DANGER),
+    ok = Color(0xFF15803D), warn = Color(0xFF8A6100), bad = Color(Palette.DANGER),
 )
 
 val LocalNanoColors = staticCompositionLocalOf { DarkColors }

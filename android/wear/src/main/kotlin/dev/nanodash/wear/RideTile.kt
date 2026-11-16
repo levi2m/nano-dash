@@ -41,7 +41,7 @@ class RideTile : TileService() {
                     .setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription("Open Nano Dash to start or stop a track").build())
                     .build(),
             )
-            .addContent(text("Track", 20f, 0xFF000000.toInt(), bold = true))
+            .addContent(text("Track", 20f, Palette.ON_ACCENT_WATCH.toInt(), bold = true))
             .build()
 
         val root = LayoutElementBuilders.Box.Builder()
