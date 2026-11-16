@@ -22,6 +22,8 @@ class RideSummary(
     /** Latitude and longitude of the track, thinned to at most [RideFolder.MAX_ROUTE_POINTS] points. */
     val route: List<Pair<Double, Double>>,
     val files: List<File>,
+    /** Heart-rate readings added from Health Connect (the lines of `health.csv`); 0 when none were added. */
+    val heartRateReadings: Int = 0,
 ) {
     /** `ride.fit`, or one `ride-<camera>.fit` per camera clock when the cameras' clocks differ. */
     val fits: List<File> get() = RideFolder.fitFiles(dir)
@@ -38,7 +40,7 @@ object RideFolder {
     fun readTextCapped(file: File, maxBytes: Long = MAX_TEXT_BYTES): String? =
         if (file.isFile && file.length() <= maxBytes) file.readText() else null
 
-    private val SHARED = listOf("gnss.csv", "imu.csv", "events.jsonl", "meta.json")
+    private val SHARED = listOf("gnss.csv", "imu.csv", "events.jsonl", "meta.json", HealthCsv.FILE)
     private val START = Regex("\"start_utc_ms\"\\s*:\\s*(\\d+)")
     private val END = Regex("\"end_utc_ms\"\\s*:\\s*(\\d+)")
     private val FIXES = Regex("\"gnss_fixes\"\\s*:\\s*(\\d+)")
@@ -74,6 +76,7 @@ object RideFolder {
             sizeKb = files.sumOf { it.length() } / 1024,
             route = track.route,
             files = files,
+            heartRateReadings = HealthCsv.parse(readTextCapped(File(dir, HealthCsv.FILE))).size,
         )
     }
 
@@ -120,11 +123,28 @@ object RideFolder {
     fun longestGapSeconds(fixes: List<GnssFix>): Long =
         fixes.zipWithNext { a, b -> b.utcMillis - a.utcMillis }.maxOrNull()?.coerceAtLeast(0)?.div(1000) ?: 0
 
-    /** Rebuilds every .fit from the logged fixes (for a ride that was interrupted, or after the writer improved). */
+    /**
+     * The first and last GPS fix of the ride in UTC milliseconds, widened by [marginMs] on both sides: the window in which to look for
+     * health readings. Null when the ride has no fixes.
+     */
+    fun fixWindow(dir: File, marginMs: Long = 0): Pair<Long, Long>? {
+        val gnss = File(dir, "gnss.csv").takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES } ?: return null
+        val times = RideRecovery.parseGnssCsv(gnss.readText()).map { it.utcMillis }
+        if (times.isEmpty()) return null
+        return (times.min() - marginMs) to (times.max() + marginMs)
+    }
+
+    /** Stores the readings as `health.csv` (replacing an earlier import) and does not touch the .fit; call [rebuildFit] after. */
+    fun saveHealth(dir: File, readings: List<HeartRateReading>) {
+        if (readings.isEmpty()) File(dir, HealthCsv.FILE).delete()
+        else writeAtomically(File(dir, HealthCsv.FILE), HealthCsv.write(readings).toByteArray())
+    }
+
+    /** Rebuilds every .fit from the logged fixes (for a ride that was interrupted, or after the writer improved), with the ride's health readings and sport. */
     fun rebuildFit(dir: File): Boolean {
         val gnss = File(dir, "gnss.csv").takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES } ?: return false
         val events = readTextCapped(File(dir, "events.jsonl"))
-        val fits = RideRecovery.rebuildFits(gnss.readText(), events) ?: return false
+        val fits = RideRecovery.rebuildFits(gnss.readText(), events, readTextCapped(File(dir, HealthCsv.FILE)), RideSport.read(dir)) ?: return false
         val keep = fits.map { it.fileName }.toSet()
         fits.forEach { writeAtomically(File(dir, it.fileName), it.bytes) }
         fitFiles(dir).filter { it.name !in keep }.forEach { it.delete() }   // old files go only after the new ones are in place

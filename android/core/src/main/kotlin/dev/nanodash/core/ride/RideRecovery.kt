@@ -3,6 +3,7 @@ package dev.nanodash.core.ride
 import dev.nanodash.core.camera.CameraTiming
 import dev.nanodash.core.fit.CameraSpan
 import dev.nanodash.core.fit.FitActivityWriter
+import dev.nanodash.core.fit.FitSport
 
 /**
  * Rebuilds a ride's .fit from the files the logger leaves behind. Useful when the app was killed before it could write
@@ -66,18 +67,24 @@ object RideRecovery {
      * different distances each get their own, shifted to that camera's clock, because Mimo matches by the clip's own time.
      * Null when there are no GPS fixes.
      */
-    fun buildFits(fixes: List<GnssFix>, clips: List<CameraClip>): List<NamedFit>? {
+    fun buildFits(
+        fixes: List<GnssFix>,
+        clips: List<CameraClip>,
+        heartRate: List<HeartRateReading> = emptyList(),
+        sport: FitSport = FitSport.MOTORCYCLING,
+    ): List<NamedFit>? {
         val groups = clips.groupBy { it.shiftMs }.values.ifEmpty { listOf(emptyList()) }
         val built = groups.map { group ->
             val first = group.firstOrNull()
-            val fit = buildFit(fixes, group.map { it.span }, first?.shiftMs ?: CameraTiming.FIT_SHIFT_MS, first?.phoneMinusGpsMs ?: 0) ?: return null
+            val fit = buildFit(fixes, group.map { it.span }, first?.shiftMs ?: CameraTiming.FIT_SHIFT_MS, first?.phoneMinusGpsMs ?: 0, heartRate, sport) ?: return null
             (first?.camera?.filter { it.isLetterOrDigit() }?.takeLast(4).orEmpty()) to fit
         }
         return built.map { (tag, fit) -> NamedFit(if (built.size == 1 || tag.isEmpty()) "" else "-$tag", fit.bytes, fit.samples) }
     }
 
     /** Rebuilds every .fit of a ride from the files the logger left behind. */
-    fun rebuildFits(gnssCsv: String, eventsJsonl: String?): List<NamedFit>? = buildFits(parseGnssCsv(gnssCsv), clipsFromEvents(eventsJsonl))
+    fun rebuildFits(gnssCsv: String, eventsJsonl: String?, healthCsv: String? = null, sport: FitSport = FitSport.MOTORCYCLING): List<NamedFit>? =
+        buildFits(parseGnssCsv(gnssCsv), clipsFromEvents(eventsJsonl), HealthCsv.parse(healthCsv), sport)
 
     /** An encoded .fit and the number of one-second samples in it. */
     class BuiltFit(val bytes: ByteArray, val samples: Int)
@@ -87,10 +94,19 @@ object RideRecovery {
      * window) so the file lines up with the clip's own clock: by default the camera's measured lag behind the phone. The
      * records are on GPS time and the camera [spans] on the phone's clock; [phoneMinusGpsMs] puts the spans on the records' time base first.
      */
-    fun buildFit(fixes: List<GnssFix>, spans: List<CameraSpan>, shiftMs: Long = CameraTiming.FIT_SHIFT_MS, phoneMinusGpsMs: Long = 0): BuiltFit? {
-        val samples = RideAssembler().assemble(fixes.map { it.copy(utcMillis = it.utcMillis + shiftMs) })
-        if (samples.isEmpty()) return null
+    fun buildFit(
+        fixes: List<GnssFix>,
+        spans: List<CameraSpan>,
+        shiftMs: Long = CameraTiming.FIT_SHIFT_MS,
+        phoneMinusGpsMs: Long = 0,
+        heartRate: List<HeartRateReading> = emptyList(),
+        sport: FitSport = FitSport.MOTORCYCLING,
+    ): BuiltFit? {
+        val assembled = RideAssembler().assemble(fixes.map { it.copy(utcMillis = it.utcMillis + shiftMs) })
+        if (assembled.isEmpty()) return null
+        // The readings are on real UTC, like the GPS fixes, so they get the same shift as the records.
+        val samples = HealthMerge.attach(assembled, heartRate, shiftMs)
         val shifted = spans.map { CameraSpan(it.startUtcMillis + shiftMs - phoneMinusGpsMs, it.endUtcMillis + shiftMs - phoneMinusGpsMs) }
-        return BuiltFit(FitActivityWriter().encode(samples, shifted), samples.size)
+        return BuiltFit(FitActivityWriter().encode(samples, shifted, sport), samples.size)
     }
 }
