@@ -51,8 +51,8 @@ internal object Crc {
 
 object Duml {
     const val SOF = 0x55
-    private const val OVERHEAD = 13          // 11 header bytes + 2 crc16
-    private const val MAX_LENGTH = 1023
+    internal const val OVERHEAD = 13          // 11 header bytes + 2 crc16
+    internal const val MAX_LENGTH = 1023
 
     fun build(
         sender: Int,
@@ -129,7 +129,7 @@ class DumlReassembler {
             // A stray 0x55 byte must not make us wait for a bogus frame length: check the header checksum first and resync.
             if ((buf[3].toInt() and 0xFF) != Crc.crc8(buf, 0, 3)) { buf = buf.copyOfRange(1, buf.size); continue }
             val length = (buf[1].toInt() and 0xFF) or ((buf[2].toInt() and 0x03) shl 8)
-            if (length < 13 || length > 1023) { buf = buf.copyOfRange(1, buf.size); continue }
+            if (length < Duml.OVERHEAD || length > Duml.MAX_LENGTH) { buf = buf.copyOfRange(1, buf.size); continue }
             if (buf.size < length) break
             out += buf.copyOfRange(0, length)
             buf = buf.copyOfRange(length, buf.size)

@@ -2,13 +2,11 @@ package dev.nanodash.logger
 
 import android.content.Context
 import android.os.SystemClock
-import androidx.core.content.edit
 import dev.nanodash.core.camera.CameraFleet
 import dev.nanodash.core.camera.CameraLink
 import dev.nanodash.core.camera.CameraNotes
 import dev.nanodash.core.camera.CameraRow
 import dev.nanodash.core.camera.CameraState
-import dev.nanodash.core.camera.CameraTiming
 import dev.nanodash.core.camera.Clock
 import dev.nanodash.core.camera.StartResult
 import dev.nanodash.core.camera.StopResult
@@ -21,7 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.security.SecureRandom
 
 /**
  * What the screen shows about the cameras. The first five fields summarise all of them (so a single camera reads exactly
@@ -39,7 +36,9 @@ data class CameraUi(
     val scanning: Boolean = false,
     val found: List<String> = emptyList(),
     val selected: Set<String> = emptySet(),
-)
+) {
+    val awaitingApproval: Boolean get() = rows.any { it.awaitingApproval }
+}
 
 object SystemClocks : Clock {
     override fun utcMillis() = System.currentTimeMillis()
@@ -68,27 +67,12 @@ object CameraController {
     private val rows = LinkedHashMap<String, CameraRow>()
     private var job: Job? = null
 
-    private fun prefs(context: Context) = context.getSharedPreferences("nanodash", Context.MODE_PRIVATE)
-
-    private fun controllerId(context: Context): String {
-        val p = prefs(context)
-        p.getString("controller_id", null)?.let { return it }
-        val id = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
-        p.edit { putString("controller_id", id) }
-        return id
-    }
-
-    private fun savedCameras(context: Context): Set<String> {
-        val p = prefs(context)
-        return p.getStringSet("camera_addresses", null) ?: setOfNotNull(p.getString("camera_address", null))   // the older single-camera key
-    }
-
     fun readyIds(): List<String> = fleet?.readyIds() ?: emptyList()
 
     /** The main button: connect the cameras chosen before, or open the picker the first time. */
     fun connect(context: Context) {
         val app = context.applicationContext
-        val saved = savedCameras(app)
+        val saved = AppPrefs.cameraAddresses(app)
         if (saved.isEmpty()) choose(app) else connectTo(app, saved)
     }
 
@@ -100,7 +84,7 @@ object CameraController {
             publish { CameraUi(choosing = true, scanning = true) }
             try {
                 val found = NanoScanner.scan(app, 8_000)
-                val saved = savedCameras(app).filter { it in found }.toSet()
+                val saved = AppPrefs.cameraAddresses(app).filter { it in found }.toSet()
                 publish { it.copy(scanning = false, found = found, selected = saved.ifEmpty { found.take(if (found.size == 1) 1 else 0).toSet() }) }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -118,13 +102,13 @@ object CameraController {
         val app = context.applicationContext
         val chosen = _ui.value.selected
         if (chosen.isEmpty()) return
-        prefs(app).edit { putStringSet("camera_addresses", chosen) }
+        AppPrefs.setCameraAddresses(app, chosen)
         connectTo(app, chosen)
     }
 
     private fun connectTo(app: Context, addresses: Set<String>) {
         disconnect(keepText = true)
-        val id = controllerId(app)
+        val id = AppPrefs.controllerId(app)
         val links = addresses.associateWith { address ->
             CameraLink(scope, SystemClocks, id) {
                 BleCameraTransport(app, address).also { t -> try { t.open() } catch (e: Exception) { t.close(); throw e } }
@@ -143,11 +127,13 @@ object CameraController {
         }
     }
 
-    private fun rowFor(row: CameraRow, st: CameraState): CameraRow = when (st) {
+    private fun rowFor(row: CameraRow, st: CameraState): CameraRow = rowText(row, st).copy(awaitingApproval = st == CameraState.AwaitingApproval)
+
+    private fun rowText(row: CameraRow, st: CameraState): CameraRow = when (st) {
         CameraState.Pairing -> row.copy(text = "Pairing", ready = false, busy = true, error = false)
         CameraState.AwaitingApproval -> row.copy(text = "Approve this phone on the camera's screen", ready = false, busy = true, error = false)
         CameraState.Waking -> row.copy(text = "Waking the camera", ready = false, busy = true, error = false)
-        CameraState.Ready -> row.copy(text = "Camera ready", ready = true, busy = false, error = false, clockSet = fleet?.clockSet(row.address) == true)
+        CameraState.Ready -> row.copy(text = "Camera ready", ready = true, busy = false, error = false, clockSet = clockSet(row.address))
         CameraState.Reconnecting -> row.copy(text = "Camera lost, reconnecting", ready = false, busy = true, error = true)
         is CameraState.Failed -> row.copy(text = st.reason, ready = false, busy = false, error = true)
         CameraState.Disconnected -> if (row.ready) row.copy(text = "Camera disconnected", ready = false, error = true) else row
@@ -182,8 +168,8 @@ object CameraController {
     /** Starts every camera that is ready (or just those in [only]), all at the same moment. Empty when none is. */
     suspend fun startRecording(only: Collection<String>? = null): Map<String, StartResult> = fleet?.startReady(only) ?: emptyMap()
 
-    /** What to add to this camera's .fit times: its clock was set to the phone's on connect, or it keeps the older, larger offset. */
-    fun fitShiftMs(address: String): Long = if (fleet?.clockSet(address) == true) CameraTiming.FIT_SHIFT_MS else CameraTiming.LEGACY_FIT_SHIFT_MS
+    /** Whether this camera's clock was set to the phone's by its current connection. */
+    fun clockSet(address: String): Boolean = fleet?.clockSet(address) == true
 
     suspend fun stopRecording(addresses: Collection<String>): Map<String, StopResult> = fleet?.stop(addresses) ?: emptyMap()
 }

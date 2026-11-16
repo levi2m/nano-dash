@@ -9,23 +9,10 @@ import dev.nanodash.core.fit.FitActivityWriter
  * the .fit, or to regenerate a file after the writer improves. Pure functions: the caller reads and writes the files.
  */
 object RideRecovery {
-    /** Parses `gnss.csv` as written by the logger: `elapsed_ns,utc_ms,lat,lon,alt_m,speed_mps,bearing_deg,h_acc_m,...`. */
-    fun parseGnssCsv(text: String): List<GnssFix> =
-        text.lineSequence().drop(1).filter { it.isNotBlank() }.mapNotNull { line ->
-            val p = line.split(',')
-            if (p.size < 8) return@mapNotNull null
-            val utc = p[1].toLongOrNull() ?: return@mapNotNull null
-            val lat = p[2].toDoubleOrNull() ?: return@mapNotNull null
-            val lon = p[3].toDoubleOrNull() ?: return@mapNotNull null
-            GnssFix(utc, lat, lon, p[4].toDoubleOrNull(), p[5].toFloatOrNull(), p[6].toFloatOrNull(), p[7].toFloatOrNull(), p.getOrNull(10)?.trim()?.toFloatOrNull(), p[0].toLongOrNull())
-        }.toList()
-
-    private val SPAN = Regex("\"clip_span_estimate_utc_ms\"\\s*:\\s*\\[\\s*(\\d+)\\s*,\\s*(\\d+)\\s*]")
+    private val SPAN = Regex("\"${LogKey.CLIP_SPAN}\"\\s*:\\s*\\[\\s*(\\d+)\\s*,\\s*(\\d+)\\s*]")
 
     /** Every camera clip's phone-time window recorded in `events.jsonl` when a camera was stopped; one per camera. */
-    fun clipSpansFromEvents(eventsJsonl: String?): List<CameraSpan> =
-        eventsJsonl?.let { text -> SPAN.findAll(text).mapNotNull { m -> val a = m.groupValues[1].toLongOrNull(); val b = m.groupValues[2].toLongOrNull(); if (a != null && b != null) CameraSpan(a, b) else null }.toList() }
-            ?: emptyList()
+    fun clipSpansFromEvents(eventsJsonl: String?): List<CameraSpan> = clipsFromEvents(eventsJsonl).map { it.span }
 
     /** One camera's clip window and how far its clock sits from the phone's, as logged when it was stopped. */
     data class CameraClip(
@@ -38,11 +25,11 @@ object RideRecovery {
         val phoneMinusGpsMs: Long = 0,
     )
 
-    private val CAMERA = Regex("\"camera\"\\s*:\\s*\"([^\"]*)\"")
-    private val SHIFT = Regex("\"fit_shift_ms\"\\s*:\\s*(-?\\d+)")
-    private val SKEW = Regex("\"phone_minus_gps_ms\"\\s*:\\s*(-?\\d+)")
+    private val CAMERA = Regex("\"${LogKey.CAMERA}\"\\s*:\\s*\"([^\"]*)\"")
+    private val SHIFT = Regex("\"${LogKey.FIT_SHIFT_MS}\"\\s*:\\s*(-?\\d+)")
+    private val SKEW = Regex("\"${LogKey.PHONE_MINUS_GPS_MS}\"\\s*:\\s*(-?\\d+)")
 
-    /** Like [clipSpansFromEvents] but with each camera's name and its calibrated shift (the default when the log has none). */
+    /** Each camera clip in `events.jsonl` with its name and calibrated shift (the legacy shift when the log has none). */
     fun clipsFromEvents(eventsJsonl: String?): List<CameraClip> =
         eventsJsonl?.lineSequence().orEmpty().mapNotNull { line ->
             val span = SPAN.find(line) ?: return@mapNotNull null
@@ -58,7 +45,7 @@ object RideRecovery {
 
     /** A finished .fit: [suffix] is "" for the usual `ride.fit`, or a tag such as "-1A2B" when each camera needs its own file. */
     class NamedFit(val suffix: String, val bytes: ByteArray, val samples: Int) {
-        val fileName: String get() = "ride$suffix.fit"
+        val fileName: String get() = RideLog.fitName(suffix)
     }
 
     /**
@@ -82,7 +69,7 @@ object RideRecovery {
 
     /** Rebuilds every .fit of a ride from the files the logger left behind. */
     fun rebuildFits(gnssCsv: String, eventsJsonl: String?, healthCsv: String? = null): List<NamedFit>? =
-        buildFits(parseGnssCsv(gnssCsv), clipsFromEvents(eventsJsonl), HealthCsv.parse(healthCsv))
+        buildFits(GnssCsv.parse(gnssCsv), clipsFromEvents(eventsJsonl), HealthCsv.parse(healthCsv))
 
     /** An encoded .fit and the number of one-second samples in it. */
     class BuiltFit(val bytes: ByteArray, val samples: Int)

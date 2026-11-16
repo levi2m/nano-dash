@@ -9,10 +9,10 @@ enum class WatchCommand { Status, Start, Stop }
 
 enum class RideState { Idle, Recording, Saving }
 enum class GpsState { Off, Searching, Fix }
-enum class CameraState { None, Ready, Recording, Problem }
+enum class WatchCamera { None, Ready, Recording, Problem }
 
 /** What the phone tells the watch: enough for the watch screen and tile, nothing about where the rider is. */
-data class WatchState(val ride: RideState, val elapsedSeconds: Long, val gps: GpsState, val camera: CameraState)
+data class WatchState(val ride: RideState, val elapsedSeconds: Long, val gps: GpsState, val camera: WatchCamera)
 
 /**
  * The text protocol between the watch and the phone, one line per message, at most [MAX_LINE_BYTES] bytes.
@@ -51,7 +51,7 @@ object WatchProtocol {
         val ride = RideState.entries.firstOrNull { it.name.lowercase() == p[1] } ?: return null
         val seconds = p[2].toLongOrNull()?.takeIf { it >= 0 } ?: return null
         val gps = GpsState.entries.firstOrNull { it.name.lowercase() == p[3] } ?: return null
-        val camera = CameraState.entries.firstOrNull { it.name.lowercase() == p[4] } ?: return null
+        val camera = WatchCamera.entries.firstOrNull { it.name.lowercase() == p[4] } ?: return null
         return WatchState(ride, seconds, gps, camera)
     }
 }
@@ -66,7 +66,7 @@ class BoundedLineReader(private val input: InputStream, private val max: Int = W
         val line = ByteArrayOutputStream()
         while (true) {
             val b = input.read()
-            if (b < 0) return null                       // the stream ended, with or without a half line: nothing complete to return
+            if (b < 0) return null
             if (b == '\n'.code) return line.toString(Charsets.UTF_8).trimEnd('\r')
             if (line.size() >= max) throw IOException("line longer than $max bytes")
             line.write(b)

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.nanodash.core.palette.Palette
 
 /*
  * Design tokens. One neutral graphite ramp carries every surface; one ember accent marks the primary action and the
@@ -43,27 +44,24 @@ class NanoColors(
     val ok: Color,
     val warn: Color,
     val bad: Color,
-    val isDark: Boolean,
 )
 
 val DarkColors = NanoColors(
-    bg = Color(0xFF141415), card = Color(0xFF19191B), raised = Color(0xFF232325), hairline = Color(0x14EDEDED),
-    text = Color(0xFFEDEDED), textSecondary = Color(0xFFA1A1A6), textMuted = Color(0xFF85858B),
-    accent = Color(0xFFFF7A1A), onAccent = Color(0xFF141415), accentText = Color(0xFFFF7A1A),
-    fill = Color(0xFFFF7A1A), onFill = Color(0xFF141415),
+    bg = Color(0xFF141415), card = Color(0xFF19191B), raised = Color(Palette.RAISED), hairline = Color(0x14EDEDED),
+    text = Color(Palette.TEXT), textSecondary = Color(Palette.TEXT_SECONDARY), textMuted = Color(Palette.TEXT_MUTED),
+    accent = Color(Palette.ACCENT), onAccent = Color(0xFF141415), accentText = Color(Palette.ACCENT),
+    fill = Color(Palette.ACCENT), onFill = Color(0xFF141415),
     danger = Color(0xFFC62E33), onDanger = Color(0xFFFFFFFF),
-    ok = Color(0xFF4CC38A), warn = Color(0xFFE3B341), bad = Color(0xFFF2575C),
-    isDark = true,
+    ok = Color(Palette.OK), warn = Color(Palette.WARN), bad = Color(Palette.BAD),
 )
 
 val LightColors = NanoColors(
     bg = Color(0xFFFAFAFA), card = Color(0xFFFFFFFF), raised = Color(0xFFF4F4F5), hairline = Color(0x14171717),
     text = Color(0xFF171717), textSecondary = Color(0xFF525252), textMuted = Color(0xFF737373),
-    accent = Color(0xFFFF7A1A), onAccent = Color(0xFF141415), accentText = Color(0xFFB53A00),
+    accent = Color(Palette.ACCENT), onAccent = Color(0xFF141415), accentText = Color(0xFFB53A00),
     fill = Color(0xFFB53A00), onFill = Color(0xFFFFFFFF),
     danger = Color(0xFFC62E33), onDanger = Color(0xFFFFFFFF),
     ok = Color(0xFF15803D), warn = Color(0xFF8A6100), bad = Color(0xFFC62E33),
-    isDark = false,
 )
 
 val LocalNanoColors = staticCompositionLocalOf { DarkColors }
@@ -75,8 +73,6 @@ object Space {
     val m = 12.dp
     val l = 16.dp
     val xl = 20.dp
-    val xxl = 24.dp
-    val xxxl = 32.dp
 }
 
 object Radius {

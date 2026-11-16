@@ -69,7 +69,7 @@ object NanoScanner {
 
 /** GATT connection to the camera, exposed as the session's [CameraTransport]. */
 @SuppressLint("MissingPermission")
-class BleCameraTransport(private val context: Context, val address: String) : CameraTransport {
+class BleCameraTransport(private val context: Context, private val address: String) : CameraTransport {
     private val _incoming = MutableSharedFlow<ByteArray>(extraBufferCapacity = 512)
     override val incoming: Flow<ByteArray> = _incoming
 
@@ -78,8 +78,7 @@ class BleCameraTransport(private val context: Context, val address: String) : Ca
     private val writeMutex = Mutex()
     private var writeDone: CompletableDeferred<Int>? = null
     private var step: CompletableDeferred<Int>? = null
-    @Volatile var closed = false
-        private set
+    @Volatile private var closed = false
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {

@@ -35,6 +35,9 @@ object CameraTiming {
      */
     const val LEGACY_FIT_SHIFT_MS = -1700L
 
+    /** What to add to a camera's .fit times: its clock was set to the phone's on connect, or it keeps the older, larger offset. */
+    fun fitShiftMs(clockSet: Boolean): Long = if (clockSet) FIT_SHIFT_MS else LEGACY_FIT_SHIFT_MS
+
     /** Estimated phone-UTC time of the clip's first frame, or null if the camera never reported recording. */
     fun firstFrameUtcMillis(start: StartResult.Started): Long? = start.recordingFlagAt?.utcMillis?.plus(FIRST_FRAME_AFTER_FLAG_MS)
 

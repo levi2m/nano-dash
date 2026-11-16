@@ -13,6 +13,8 @@ data class CameraRow(
     val recording: Boolean? = null,
     /** True when this connection set the camera's clock to the phone's. */
     val clockSet: Boolean = false,
+    /** The camera is showing an approval prompt for this phone. */
+    val awaitingApproval: Boolean = false,
 ) {
     val label: String get() = cameraLabel(address)
 }
@@ -24,7 +26,7 @@ data class CameraSummary(val text: String, val ready: Boolean, val busy: Boolean
 object CameraNotes {
     fun summarize(rows: List<CameraRow>): CameraSummary {
         if (rows.isEmpty()) return CameraSummary("Camera not connected", ready = false, busy = false, error = false, recording = null)
-        val text = rows.firstOrNull { it.text.startsWith("Approve") }
+        val text = rows.firstOrNull { it.awaitingApproval }
             ?.let { if (rows.size == 1) it.text else "Approve this phone on the screen of ${it.label}" }
             ?: if (rows.size == 1) rows[0].text
             else rows.firstOrNull { it.error }?.let { "${it.label}: ${it.text}" } ?: "${rows.count { it.ready }} of ${rows.size} cameras ready"
@@ -44,15 +46,15 @@ object CameraNotes {
         for ((address, r) in results) {
             val who = if (connected == 1) "Camera" else cameraLabel(address)
             when (r) {
-                is StartResult.Started -> if (r.recordingFlagAt != null) recording++ else problems += "$who accepted the command but did not report recording"
+                is StartResult.Started -> if (r.recordingFlagAt != null) recording++ else problems += "$who accepted the command but did not report recording."
                 is StartResult.Rejected -> problems += "$who refused to record (code %02X). Is USB connected?".format(r.code ?: 0)
-                StartResult.NoReply -> problems += "$who did not answer the start command"
-                StartResult.NotReady -> problems += "$who is not ready"
+                StartResult.NoReply -> problems += "$who did not answer the start command."
+                StartResult.NotReady -> problems += "$who is not ready."
             }
         }
         val missed = connected - results.size
-        if (missed > 0) problems += if (missed == 1) "1 camera was not ready and has no video" else "$missed cameras were not ready and have no video"
-        val detail = problems.joinToString(". ").let { if (it.endsWith("?")) it else "$it." }
+        if (missed > 0) problems += if (missed == 1) "1 camera was not ready and has no video." else "$missed cameras were not ready and have no video."
+        val detail = problems.joinToString(" ")
         return when {
             problems.isEmpty() -> if (recording == 1) "Camera recording" else "$recording cameras recording"
             connected == 1 -> detail
