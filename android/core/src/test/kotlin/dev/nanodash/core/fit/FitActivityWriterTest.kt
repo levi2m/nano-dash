@@ -186,4 +186,34 @@ class FitActivityWriterTest {
         out.writeBytes(FitActivityWriter().encode(syntheticRide(), listOf(CameraSpan(start + 10_000, start + 70_000))))
         assertTrue(out.length() > 1000)
     }
+
+    @Test
+    fun aRideWithoutHeartRateKeepsTheFileItAlwaysHad() {
+        val fit = ParsedFit(FitActivityWriter().encode(syntheticRide()))
+        assertTrue(fit.of(20).all { 3 !in it.fields }, "no heart_rate field in records")
+        val session = fit.of(18).single().fields
+        assertTrue(16 !in session && 17 !in session, "no avg/max heart rate in the session")
+        assertEquals(22, session.getValue(5)[0].toInt())   // motorcycling
+    }
+
+    @Test
+    fun heartRateIsWrittenPerRecordAndInvalidWhereThereIsNoReading() {
+        val ride = syntheticRide().mapIndexed { i, s -> if (i in 10..19) s else s.copy(heartRateBpm = 100 + i) }
+        val fit = ParsedFit(FitActivityWriter().encode(ride))
+        for ((i, r) in fit.of(20).withIndex()) {
+            val hr = r.fields.getValue(3)
+            assertEquals(1, hr.size)
+            assertEquals(if (i in 10..19) 0xFF else 100 + i, hr[0].toInt() and 0xFF, "record $i")
+        }
+        assertTrue(fit.headerCrcOk && fit.fileCrcOk)
+    }
+
+    @Test
+    fun sessionCarriesAverageAndMaxHeartRateAndTheChosenSport() {
+        val ride = syntheticRide().map { it.copy(heartRateBpm = if (it.utcMillis == start + 5_000) 180 else 120) }
+        val session = ParsedFit(FitActivityWriter().encode(ride, sport = FitSport.CYCLING)).of(18).single().fields
+        assertEquals(2, session.getValue(5)[0].toInt())                        // cycling
+        assertEquals(121, session.getValue(16)[0].toInt() and 0xFF)            // (119 * 120 + 180) / 120 = 120.5, rounds to 121
+        assertEquals(180, session.getValue(17)[0].toInt() and 0xFF)
+    }
 }

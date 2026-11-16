@@ -22,6 +22,10 @@ object HealthCsv {
     fun write(readings: List<HeartRateReading>): String =
         HEADER + "\n" + readings.sortedBy { it.utcMillis }.joinToString("") { "${it.utcMillis},${it.bpm}\n" }
 
+    /** How many readings the file holds, counted by lines without parsing them (the ride list asks for every ride on every refresh). 0 when there is no file. */
+    fun count(file: File): Int =
+        if (!file.isFile || file.length() > RideFolder.MAX_TEXT_BYTES) 0 else file.useLines { lines -> (lines.count { it.isNotBlank() } - 1).coerceAtLeast(0) }
+
     /** Bad lines and out-of-range rates are skipped, not repaired. */
     fun parse(text: String?): List<HeartRateReading> =
         text?.lineSequence()?.drop(1)?.mapNotNull { line ->
@@ -66,6 +70,21 @@ object HealthMerge {
             t - before.utcMillis <= after.utcMillis - t -> before
             else -> after
         }
+    }
+}
+
+/** Which rides the app looks up heart rate for by itself. */
+object HealthImport {
+    const val DAYS = 3L
+    const val MAX_RIDES = 5
+
+    /**
+     * Rides that have a .fit and GPS fixes but no readings yet, and ended no more than [DAYS] days before [nowMs], newest first, at most [MAX_RIDES].
+     * A ride cut off has no duration, so its start stands for its end. [rides] come newest first, as [RideFolder.list] returns them.
+     */
+    fun due(rides: List<RideSummary>, nowMs: Long): List<RideSummary> {
+        val cutoff = nowMs - DAYS * 86_400_000L
+        return rides.filter { it.hasFit && it.fixes > 0 && it.heartRateReadings == 0 && it.startUtcMillis + (it.durationSeconds ?: 0) * 1000 > cutoff }.take(MAX_RIDES)
     }
 }
 

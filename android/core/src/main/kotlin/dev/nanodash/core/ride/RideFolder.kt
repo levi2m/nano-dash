@@ -1,5 +1,6 @@
 package dev.nanodash.core.ride
 
+import dev.nanodash.core.fit.FitSport
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -24,6 +25,8 @@ class RideSummary(
     val files: List<File>,
     /** Heart-rate readings added from Health Connect (the lines of `health.csv`); 0 when none were added. */
     val heartRateReadings: Int = 0,
+    /** The sport the ride's .fit declares (`sport.txt`). */
+    val sport: FitSport = FitSport.MOTORCYCLING,
 ) {
     /** `ride.fit`, or one `ride-<camera>.fit` per camera clock when the cameras' clocks differ. */
     val fits: List<File> get() = RideFolder.fitFiles(dir)
@@ -76,7 +79,8 @@ object RideFolder {
             sizeKb = files.sumOf { it.length() } / 1024,
             route = track.route,
             files = files,
-            heartRateReadings = HealthCsv.parse(readTextCapped(File(dir, HealthCsv.FILE))).size,
+            heartRateReadings = HealthCsv.count(File(dir, HealthCsv.FILE)),
+            sport = RideSport.read(dir),
         )
     }
 

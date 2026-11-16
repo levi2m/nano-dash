@@ -48,9 +48,24 @@ class ManifestPolicyTest {
     fun theWatchAppHasNoNetworkPermissionAndNoBackup() = assertNoNetworkNoBackup(parse(File(wear, "AndroidManifest.xml")))
 
     @Test
-    fun onlyTheLauncherActivityIsExported() {
+    fun onlyTheLauncherAndTheHealthRationaleActivitiesAreExported() {
         val doc = parse(File(main, "AndroidManifest.xml"))
-        assertEquals(mapOf(".MainActivity" to "true", ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false"), exportedComponents(doc))
+        assertEquals(
+            mapOf(".MainActivity" to "true", ".HealthRationaleActivity" to "true", ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false"),
+            exportedComponents(doc),
+        )
+        // The rationale screen answers only Health Connect's own action.
+        val activities = doc.getElementsByTagName("activity")
+        val rationale = (0 until activities.length).map { activities.item(it) }
+            .single { it.attributes.getNamedItemNS(androidNs, "name").nodeValue == ".HealthRationaleActivity" } as org.w3c.dom.Element
+        val actions = rationale.getElementsByTagName("action")
+        assertEquals(listOf("android.health.connect.action.SHOW_PERMISSIONS_RATIONALE"), (0 until actions.length).map { actions.item(it).attributes.getNamedItemNS(androidNs, "name").nodeValue })
+    }
+
+    @Test
+    fun theAppReadsHeartRateAndNothingElseFromHealthConnect() {
+        val health = permissions(parse(File(main, "AndroidManifest.xml"))).filter { it.startsWith("android.permission.health.") }
+        assertEquals(listOf("android.permission.health.READ_HEART_RATE"), health)
     }
 
     @Test

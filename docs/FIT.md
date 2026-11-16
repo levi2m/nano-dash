@@ -10,6 +10,10 @@ Written by our own encoder (`android/core/.../fit/`), from the public FIT file-f
 
 Timestamp (rounded to the nearest second, on the camera's clock; see SYNC.md), latitude, longitude, altitude (sea level on Android 14+; fixes with vertical accuracy worse than 20 m are ignored), distance, speed, grade, and the enhanced speed and altitude fields. These are the fields Mimo's own export has, and Mimo reads speed, elevation, distance and the track from them.
 
+## Heart rate (optional)
+
+When the ride folder has a `health.csv` (added from Health Connect, see [HEALTH.md](HEALTH.md)), each record also has `heart_rate` (field 3, bpm, invalid where no reading is within 5 s) and the session has `avg_heart_rate` and `max_heart_rate`. A ride without readings has none of these fields. A ride's `sport.txt` can change the session sport from motorcycling (22) to cycling (2). Untested in Mimo.
+
 ## Developer fields
 
 Application id `nano-dash-logger`:

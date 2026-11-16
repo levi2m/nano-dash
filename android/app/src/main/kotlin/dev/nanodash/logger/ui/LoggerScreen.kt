@@ -46,6 +46,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,11 +85,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.nanodash.logger.BuildConfigInfo
 import dev.nanodash.logger.CameraController
 import dev.nanodash.logger.CameraUi
+import dev.nanodash.logger.HealthConnectReader
 import dev.nanodash.logger.LoggerService
 import dev.nanodash.logger.Note
 import dev.nanodash.logger.RideFiles
 import dev.nanodash.logger.RideStore
+import dev.nanodash.core.fit.FitSport
+import dev.nanodash.core.ride.HealthImport
 import dev.nanodash.core.ride.RideFolder
+import dev.nanodash.core.ride.RideSport
 import dev.nanodash.core.ride.RideSummary
 import dev.nanodash.core.ride.SpeedUnit
 import dev.nanodash.logger.RideUiState
@@ -114,6 +119,9 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 
+/** How far outside the first and last GPS fix to look for heart rate, so a reading just before Start or after Stop is not missed. */
+private const val HEALTH_WINDOW_MARGIN_MS = 10_000L
+
 @Composable
 fun LoggerScreen() {
     val context = LocalContext.current
@@ -131,8 +139,10 @@ fun LoggerScreen() {
     var unit by remember { mutableStateOf(SpeedUnit.saved(prefs.getString("speed_unit", null)) ?: SpeedUnit.forCountry(region)) }
     // Location can be switched off, or permission revoked, while the app is in the background, so look again every time it returns.
     var gps by remember { mutableStateOf(GpsReadiness.Ready) }
+    var resumes by remember { mutableIntStateOf(0) }   // the automatic heart-rate pass runs once per return to the app
     LifecycleResumeEffect(Unit) {
         gps = gpsReadiness(context)
+        resumes++
         onPauseOrDispose { }
     }
 
@@ -150,6 +160,53 @@ fun LoggerScreen() {
         }
     }
     LaunchedEffect(ui.recording, ui.message) { reload() }
+
+    // Heart rate from Health Connect (Android 14 and later): read what the watch recorded during the ride and rebuild the .fit with it.
+    val healthAvailable = remember { HealthConnectReader.available(context) }
+    fun say(text: String, problem: Boolean = true) = RideStore.update { it.copy(message = Note(text, problem = problem)) }
+    /** [manual] is a tap on the button: it explains an empty result. The automatic pass stays quiet and tries again next time. Returns true when readings were added. */
+    suspend fun importHeartRate(ride: RideSummary, manual: Boolean = true): Boolean {
+        try {
+            val window = withContext(Dispatchers.IO) { RideFolder.fixWindow(ride.dir, HEALTH_WINDOW_MARGIN_MS) }
+            if (window == null) { if (manual) say("This ride has no GPS fixes, so there is no time range to look up."); return false }
+            val readings = HealthConnectReader.readHeartRate(context, window.first, window.second)
+            if (readings.isEmpty()) {
+                if (manual) say("No heart rate in Health Connect for this ride. Did the watch workout sync to Health Connect, and was it recorded after you gave Nano Dash access?")
+                return false
+            }
+            withContext(Dispatchers.IO) { RideFolder.saveHealth(ride.dir, readings); RideFolder.rebuildFit(ride.dir) }
+            say("Added ${readings.size} heart-rate readings to the .fit.", problem = false)
+            return true
+        } catch (e: IOException) {
+            if (manual) fileFailed()
+        } catch (e: SecurityException) {
+            if (manual) say("Health Connect did not allow reading heart rate. Give Nano Dash access in Health Connect.")
+        } catch (e: RuntimeException) {   // HealthConnectException is one; not named here so phones older than Android 14 never load it
+            if (manual) say("Health Connect could not be read: ${e.message ?: "unknown error"}")
+        }
+        return false
+    }
+    // The automatic pass: once Health Connect access is given, a recent ride with no heart rate yet gets it when the app is open, with no tap.
+    // The watch may sync late, so a ride that found nothing is tried again on the next return to the app and after the next ride, until it is older than HealthImport.DAYS.
+    LaunchedEffect(resumes, ui.recording, ui.saving) {
+        if (!healthAvailable || ui.recording || ui.saving || !HealthConnectReader.granted(context)) return@LaunchedEffect
+        val due = withContext(Dispatchers.IO) { HealthImport.due(RideFiles.list(context), System.currentTimeMillis()) }
+        var added = false
+        for (ride in due) if (importHeartRate(ride, manual = false)) added = true
+        if (added) reload()
+    }
+    var healthRide by remember { mutableStateOf<RideSummary?>(null) }
+    val healthPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        val ride = healthRide
+        healthRide = null
+        if (ride == null) return@rememberLauncherForActivityResult
+        if (ok) scope.launch { importHeartRate(ride); reload() }
+        else say("Heart rate needs access in Health Connect. Allow Nano Dash there, then try again.")
+    }
+    fun addHeartRate(ride: RideSummary) {
+        if (HealthConnectReader.granted(context)) scope.launch { importHeartRate(ride); reload() }
+        else { healthRide = ride; healthPermission.launch(HealthConnectReader.PERMISSION) }
+    }
     // With quick start on, the service is armed whenever the app is on screen: Android only lets it start from the foreground.
     LaunchedEffect(Unit) { LoggerService.arm(context) }
     LaunchedEffect(ui.recording) {
@@ -298,6 +355,21 @@ fun LoggerScreen() {
                             }
                         },
                         onDelete = { confirmDelete = ride },
+                        onAddHeartRate = if (healthAvailable && ride.hasFit && !ui.recording) ({ addHeartRate(ride) }) else null,
+                        onChangeSport = {
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        val next = if (RideSport.read(ride.dir) == FitSport.CYCLING) FitSport.MOTORCYCLING else FitSport.CYCLING
+                                        RideSport.write(ride.dir, next)
+                                        RideFolder.rebuildFit(ride.dir)
+                                    }
+                                } catch (e: IOException) {
+                                    fileFailed()
+                                }
+                                reload()
+                            }
+                        },
                     )
                 }
                 if (!ui.recording) {
@@ -752,7 +824,7 @@ private fun EmptyRides() {
 }
 
 @Composable
-private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onOpenRoute: () -> Unit, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit) {
+private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onOpenRoute: () -> Unit, onShareFit: () -> Unit, onShareAll: () -> Unit, onRebuild: () -> Unit, onDelete: () -> Unit, onAddHeartRate: (() -> Unit)?, onChangeSport: () -> Unit) {
     val c = nanoColors
     val locale = LocalConfiguration.current.locales[0]
     // The quiet Delete button is 48 dp tall with its label centred, so the card needs less bottom padding than the others.
@@ -783,6 +855,12 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onO
             ride.cameraClipSeconds.forEachIndexed { i, s ->
                 Fact(if (ride.cameraClipSeconds.size == 1) "Camera clip" else "Camera ${i + 1} clip", "%.1f s".format(s))
             }
+            if (ride.heartRateReadings > 0) {
+                Fact("Heart rate readings", ride.heartRateReadings.toString())
+                // Which sport Mimo needs for its heart-rate widget is untested, so the rider can switch it and re-import.
+                val sport = ride.sport
+                Fact("Sport in the .fit", if (sport == FitSport.CYCLING) "Cycling" else "Motorcycling")
+            }
         }
 
         // Amber is spent on the newest ride only, so a list of old no-fix rides does not shout.
@@ -804,6 +882,12 @@ private fun RideCard(ride: RideSummary, emphasise: Boolean, unit: SpeedUnit, onO
                     NanoButton("All files", onShareAll, Modifier.weight(1f), ButtonKind.Secondary, height = 48.dp)
                 }
                 else -> NanoButton("Share raw files", onShareAll, Modifier.weight(1f), ButtonKind.Secondary, height = 48.dp)
+            }
+        }
+        if (onAddHeartRate != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalAlignment = Alignment.CenterVertically) {
+                NanoButton(if (ride.heartRateReadings > 0) "Update heart rate" else "Add heart rate", onAddHeartRate, Modifier.weight(1f), ButtonKind.Secondary, height = 48.dp)
+                if (ride.heartRateReadings > 0) NanoButton("Switch sport", onChangeSport, Modifier.weight(1f), ButtonKind.Secondary, height = 48.dp)
             }
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {

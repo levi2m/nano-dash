@@ -20,6 +20,9 @@
     <!-- keeps the CPU awake so motion sensor events keep arriving with the screen off during a ride -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Heart rate from Health Connect (Android 14 and later), read only, asked for when the rider taps "Add heart rate" on a ride. -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
@@ -40,6 +43,15 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Health Connect opens this to show why the app reads heart rate. It is text only and reads nothing from the intent. -->
+        <activity
+            android:name=".HealthRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.health.connect.action.SHOW_PERMISSIONS_RATIONALE" />
             </intent-filter>
         </activity>
 
