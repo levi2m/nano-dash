@@ -4,14 +4,14 @@ Read this before changing anything. It holds the rules that are easy to break wi
 
 ## What this is
 
-Nano Dash: an Android ride logger that starts and stops a DJI Osmo Nano over Bluetooth, logs GPS and motion on the phone, and writes a `.fit` for DJI Mimo. Plus an optional Wear OS remote. Unofficial; not affiliated with DJI or Garmin.
+Nano Dash: an Android track logger that starts and stops a DJI Osmo Nano over Bluetooth, logs GPS and motion on the phone, and writes a `.fit` for DJI Mimo. Plus an optional Wear OS remote. Unofficial; not affiliated with DJI or Garmin.
 
 ## Layout
 
-- `android/core`: pure Kotlin, **no Android dependency**. Camera protocol (`duml`, `camera`), FIT writer (`fit`), ride assembly (`ride`), watch protocol (`watch`). Tests in `core/src/test`, including a fake Nano.
+- `android/core`: pure Kotlin, **no Android dependency**. Camera protocol (`duml`, `camera`), FIT writer (`fit`), track assembly (`ride`), watch protocol (`watch`). Tests in `core/src/test`, including a fake Nano.
 - `android/app`: the phone app (service, UI, Bluetooth, watch listener).
 - `android/wear`: the Wear OS watch app.
-- `docs/`: design and measurement notes (`PROTOCOL.md`, `SYNC.md`, `FIT.md`, `WEAR_OS.md`, `WEAR_UI.md`, `GARMIN.md`, `RELEASING.md`, `FDROID.md`).
+- `docs/`: design and measurement notes (`PROTOCOL.md`, `SYNC.md`, `FIT.md`, `HEALTH.md`, `WEAR_OS.md`, `WEAR_UI.md`, `GARMIN.md`, `RELEASING.md`, `FDROID.md`).
 - `scripts/`: CI checks (`check-no-internet.sh`, `release-info.sh`).
 - `tools/`: Python helpers (`validate_fit.py`) and spikes.
 - `fdroid/`, `fastlane/`: F-Droid recipe and store listing.
@@ -32,9 +32,9 @@ CI also builds both apps and runs `scripts/check-no-internet.sh`. Needs JDK 21 a
 - **`core` stays pure Kotlin.** No `android.*` imports there. New logic gets a test.
 - **No DJI or Garmin SDK material.** No code, documents or demos from DJI's SDK or developer material, or Garmin's FIT SDK or Connect IQ SDK, in the tree. Protocol facts come from observing our own camera or from MIT-licensed sources such as Osmosis. Any future proprietary dependency goes only into a separate GitHub-only build flavour, never into the F-Droid build (see `docs/GARMIN.md`).
 - **Free dependencies only** in the default build, so F-Droid can build it. No Google Play services.
-- **No personal data** in commits: no GPS tracks, ride folders, `.fit` or video files, device addresses, serials or real names from logs.
+- **No personal data** in commits: no GPS tracks, track folders, `.fit` or video files, device addresses, serials or real names from logs.
 - **Do not change** without the maintainer asking: the application id `io.github.levi2m.nanodash`, signing and release setup (`.github/workflows/ci.yml`, `docs/RELEASING.md`), the watch link's service id and protocol version in `WatchProtocol`, or the exported components (checked by `ManifestPolicyTest`).
-- **Safety first.** A stray touch must not end a ride quietly (Stop on the watch is a hold). Never encourage using the phone while riding.
+- **Safety first.** A stray touch must not end a track quietly (Stop on the watch is a hold). Never encourage using the phone while recording.
 
 ## Evidence, not guesses
 

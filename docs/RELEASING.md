@@ -53,6 +53,6 @@ Until step 4 is done, the secrets remain readable by workflows on other branches
 
 2. Raise `nanodash.versionName` in `android/gradle.properties` if the version changed (both apps, CI and the F-Droid recipe's `versionName` follow it).
 3. From `android/`: `./gradlew :core:test :app:lintDebug :app:assembleRelease :wear:assembleRelease -PversionCode=N`, with N higher than the latest release's number (the last part of its tag, e.g. 7 for `v0.1.0-7`); without it the code is 1 and the APK cannot install over a CI release. The signed APK is `app/build/outputs/apk/release/app-release.apk` (the watch app: `wear/build/outputs/apk/release/wear-release.apk`); without `keystore.properties` it is `app-release-unsigned.apk`.
-4. Check it: `apksigner verify --print-certs app-release.apk`, install it, and do a short ride.
+4. Check it: `apksigner verify --print-certs app-release.apk`, install it, and do a short track.
 5. Tag and publish: `git tag vX.Y.Z && git push origin vX.Y.Z`, then create a GitHub release and attach the APK and its SHA-256 (`sha256sum app-release.apk > nano-dash-vX.Y.Z.apk.sha256`, after renaming the APK to the name inside the file). CI does this by itself.
 6. F-Droid: the build is plain Gradle with free-software dependencies only. The recipe is not filed yet; see [FDROID.md](FDROID.md).
