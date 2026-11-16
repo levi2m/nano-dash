@@ -38,7 +38,7 @@ body:
     id: notes
     attributes:
       label: Notes
-      description: "Ride length, screen off or on, more than one camera. Attach meta.json and events.jsonl from the ride folder if you can; leave out gnss.csv if you do not want to share your route. These files hold no coordinates, but they do show your phone model, the exact ride times and the last five characters of the camera address."
+      description: "Track length, screen off or on, more than one camera. Attach meta.json and events.jsonl from the track folder if you can; leave out gnss.csv if you do not want to share your route. These files hold no coordinates, but they do show your phone model, the exact ride times and the last five characters of the camera address."
   - type: textarea
     id: watch
     attributes:

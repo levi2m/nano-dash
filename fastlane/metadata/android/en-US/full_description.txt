@@ -7,6 +7,7 @@ Nano Dash is a track logger for the DJI Osmo Nano camera, for any sport. It star
 <li>Logs the track with the screen off: GPS at 1 Hz, motion sensors and pressure.</li>
 <li>Writes a Mimo-importable .fit file with speed, route, elevation and estimated lean angle.</li>
 <li>Controls several Nanos at once.</li>
+<li>Optional heart rate from your watch (Android 14 and later): the app reads the readings Health Connect holds for the track, read only, and writes them into the .fit so Mimo can show them.</li>
 <li>Opens a track's route in a maps app of your choice as GPX.</li>
 <li>Shows speed and distance in km or miles; you pick.</li>
 <li>Works with TalkBack and other screen readers: headings, spoken status and route descriptions, large touch targets, light and dark themes and large font sizes.</li>
@@ -16,7 +17,7 @@ Nano Dash is a track logger for the DJI Osmo Nano camera, for any sport. It star
 There is also a Wear OS companion app that starts and stops a track from your wrist. It is completely optional: Nano Dash does everything without it, and it is not part of this F-Droid build. It is a separate download on the project page and needs developer mode on the watch.
 
 <b>Private by design</b>
-The app has no internet permission. Tracks stay on your phone and leave only when you tap Share. There is no account, no analytics and no crash reporting. Backups and device transfers are switched off for the app.
+The app has no internet permission, and it asks for one health permission only if you use the optional heart-rate feature. Tracks stay on your phone and leave only when you tap Share. There is no account, no analytics and no crash reporting. Backups and device transfers are switched off for the app.
 
 <b>Good to know</b>
 DJI Mimo is needed once, at the end, to import the .fit file together with the clip. The app is unofficial and is not affiliated with, endorsed by or sponsored by DJI or Garmin. It is not for safety-critical use, and you should never operate your phone while recording: start the track before you move off. It has been tested on one Osmo Nano and one Samsung phone, so other phones and cameras are welcome as compatibility reports on the project page.

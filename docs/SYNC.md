@@ -17,13 +17,13 @@ The shake test held phone and camera together. The phone's gyroscope speed again
 
 ## The camera's clock
 
-The camera's offset from the phone differs from unit to unit: the development Nano, set earlier by Mimo, ran 1.45 to 1.81 s behind. So the app sets the camera's clock on every connect, over Bluetooth: command `00/6A` to the clock receiver `0x28` (documented by Osmosis, accepted by the Nano) with unix seconds, UTC offset and zone id. The camera takes whole seconds, so the write is timed to arrive 25 ms before a second boundary of the phone's clock. A camera that is already recording (a link that dropped mid-ride) is not set again.
+The camera's offset from the phone differs from unit to unit: the development Nano, set earlier by Mimo, ran 1.45 to 1.81 s behind. So the app sets the camera's clock on every connect, over Bluetooth: command `00/6A` to the clock receiver `0x28` (documented by Osmosis, accepted by the Nano) with unix seconds, UTC offset and zone id. The camera takes whole seconds, so the write is timed to arrive 25 ms before a second boundary of the phone's clock. A camera that is already recording (a link that dropped mid-track) is not set again.
 
-Measured with a PC as reference: eight test clips over three separate sets, one after a power cycle, all agree that the camera then sits 357 to 361 ms behind. The clip header has 1 s resolution, so the starts were spread across the second to pin it down. The writer moves the records 360 ms earlier (`CameraTiming.CLOCK_BEHIND_PHONE_MS`). A camera that does not accept the command keeps the old 1.7 s value, and so do ride logs written before this (`fit_shift_ms` in the events). This assumes the phone's Bluetooth write delay is close to the PC's that was measured. A ride will show whether it is; if not, the constant is one line.
+Measured with a PC as reference: eight test clips over three separate sets, one after a power cycle, all agree that the camera then sits 357 to 361 ms behind. The clip header has 1 s resolution, so the starts were spread across the second to pin it down. The writer moves the records 360 ms earlier (`CameraTiming.CLOCK_BEHIND_PHONE_MS`). A camera that does not accept the command keeps the old 1.7 s value, and so do track logs written before this (`fit_shift_ms` in the events). This assumes the phone's Bluetooth write delay is close to the PC's that was measured. A track will show whether it is; if not, the constant is one line.
 
 ## The phone's clock against the GPS
 
-The records are GPS time but the camera's clock came from the phone. If the phone's clock is off, the overlay is off by the same amount. Every fix carries its GPS time and the phone's monotonic clock, and the ride's start recorded both the phone's UTC clock and the monotonic clock. At the end of a ride the median of (phone clock minus GPS time) is added to the shift and written to `meta.json` and the camera events as `phone_minus_gps_ms`. Fewer than five fixes, or a difference over two minutes, is ignored. The app warns when the phone's automatic time is off.
+The records are GPS time but the camera's clock came from the phone. If the phone's clock is off, the overlay is off by the same amount. Every fix carries its GPS time and the phone's monotonic clock, and the track's start recorded both the phone's UTC clock and the monotonic clock. At the end of a track the median of (phone clock minus GPS time) is added to the shift and written to `meta.json` and the camera events as `phone_minus_gps_ms`. Fewer than five fixes, or a difference over two minutes, is ignored. The app warns when the phone's automatic time is off.
 
 ## Seconds
 
@@ -33,9 +33,9 @@ A `.fit` timestamp is a whole second. Records are rounded to the nearest second,
 
 How the 357 to 361 ms was found. Run `tools/ble-spike/set_clock_trials.py` (sets the clock on a second boundary, then records three clips with their first frames spread across the second), then read each clip's creation time with `tools/ble-spike/clip_header.py`. Header times are UTC, whole seconds, about one second after the time in the file name. Each clip says the lag lies between (first frame in your clock − header − 1 s) and (first frame − header). The intersection of the three windows is the answer. `tools/ble-spike/status_probe.py` dumps what the camera sends by itself; it showed no clock in any message.
 
-## Real rides
+## Real tracks
 
-Three rides on 2026-11-03, made with the earlier 1.7 s shift and truncated seconds: the file's camera window started 1 to 2 s after the clip header and ended within 1 s of the clip's end, which is the header's resolution. A later short ride on build 32, with the phone locked in a pocket and the screen off, lined up with its clip in Mimo, so the 360 ms offset, rounding and the GPS correction hold for that ride. Longer rides and a second camera are still untested.
+Three tracks on 2026-11-03, made with the earlier 1.7 s shift and truncated seconds: the file's camera window started 1 to 2 s after the clip header and ended within 1 s of the clip's end, which is the header's resolution. A later short track on build 32, with the phone locked in a pocket and the screen off, lined up with its clip in Mimo, so the 360 ms offset, rounding and the GPS correction hold for that track. Longer tracks and a second camera are still untested.
 
 ## Limits
 
