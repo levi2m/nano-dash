@@ -49,6 +49,7 @@ import dev.nanodash.core.watch.WatchState
 import dev.nanodash.core.ride.ClockSkew
 import dev.nanodash.core.ride.GnssCsv
 import dev.nanodash.core.ride.GnssFix
+import dev.nanodash.core.ride.LogEvent
 import dev.nanodash.core.ride.LogKey
 import dev.nanodash.core.ride.RideFolder
 import dev.nanodash.core.ride.RideLog
@@ -341,7 +342,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         s.cameraJob = CameraController.scope.launch {
             if (CameraController.readyIds().isEmpty()) {
                 RideStore.update { it.copy(cameraNote = Note("Camera not connected, so this track has no video.")) }
-                s.event(JSONObject().put("event", "camera_not_ready"))
+                s.event(JSONObject().put(LogKey.EVENT, LogEvent.CAMERA_NOT_READY))
             } else {
                 RideStore.update { it.copy(cameraNote = Note("Starting the camera", problem = false)) }
                 withContext(NonCancellable) { recordStarts(s, CameraController.startRecording()) }
@@ -357,14 +358,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun recordStarts(s: Session, results: Map<String, StartResult>) {
         s.cameras = s.cameras + results
         for ((address, r) in results) {
-            val camera = JSONObject().put("camera", cameraLabel(address))
+            val camera = JSONObject().put(LogKey.CAMERA, cameraLabel(address))
             when (r) {
                 is StartResult.Started -> s.event(
-                    camera.put("event", "camera_start")
-                        .put("command_sent", stampJson(r.commandSent)).put("reply", stampJson(r.replyAt))
-                        .put("recording_flag", stampJson(r.recordingFlagAt)),
+                    camera.put(LogKey.EVENT, LogEvent.CAMERA_START)
+                        .put(LogKey.COMMAND_SENT, stampJson(r.commandSent)).put(LogKey.REPLY, stampJson(r.replyAt))
+                        .put(LogKey.RECORDING_FLAG, stampJson(r.recordingFlagAt)),
                 )
-                is StartResult.Rejected -> s.event(camera.put("event", "camera_start_rejected").put("code", r.code ?: JSONObject.NULL))
+                is StartResult.Rejected -> s.event(camera.put(LogKey.EVENT, LogEvent.CAMERA_START_REJECTED).put(LogKey.CODE, r.code ?: JSONObject.NULL))
                 else -> Unit
             }
         }
@@ -372,7 +373,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         RideStore.update { it.copy(cameraNote = Note(CameraNotes.startNote(connected, s.cameras), problem = !CameraNotes.startOk(connected, s.cameras))) }
     }
 
-    private fun stampJson(s: Stamp?): Any = if (s == null) JSONObject.NULL else JSONObject().put("utc_ms", s.utcMillis).put("elapsed_ns", s.monoNanos)
+    private fun stampJson(s: Stamp?): Any = if (s == null) JSONObject.NULL else JSONObject().put(LogKey.UTC_MS, s.utcMillis).put(LogKey.ELAPSED_NS, s.monoNanos)
 
     private fun spanJson(span: CameraSpan?): Any = if (span == null) JSONObject.NULL else JSONArray(listOf(span.startUtcMillis, span.endUtcMillis))
 
@@ -436,9 +437,9 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                 if (start == null) {
                     untimed += cameraLabel(address)
                     s.event(
-                        JSONObject().put("event", "camera_stop_untimed").put(LogKey.CAMERA, cameraLabel(address))
-                            .put("command_sent", stampJson(stop.commandSent)).put("reply", stampJson(stop.replyAt))
-                            .put("flag_cleared", stampJson(stop.flagClearedAt)),
+                        JSONObject().put(LogKey.EVENT, LogEvent.CAMERA_STOP_UNTIMED).put(LogKey.CAMERA, cameraLabel(address))
+                            .put(LogKey.COMMAND_SENT, stampJson(stop.commandSent)).put(LogKey.REPLY, stampJson(stop.replyAt))
+                            .put(LogKey.FLAG_CLEARED, stampJson(stop.flagClearedAt)),
                     )
                     continue
                 }
@@ -447,10 +448,10 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                 val shift = lag + (skewMs ?: 0)
                 if (span != null) { spans[address] = span; clips += RideRecovery.CameraClip(cameraLabel(address), span, shift, skewMs ?: 0) }
                 s.event(
-                    JSONObject().put("event", "camera_stop").put(LogKey.CAMERA, cameraLabel(address))
+                    JSONObject().put(LogKey.EVENT, LogEvent.CAMERA_STOP).put(LogKey.CAMERA, cameraLabel(address))
                         .put(LogKey.FIT_SHIFT_MS, shift).put(LogKey.PHONE_MINUS_GPS_MS, skewMs ?: 0)
-                        .put("command_sent", stampJson(stop.commandSent)).put("reply", stampJson(stop.replyAt))
-                        .put("flag_cleared", stampJson(stop.flagClearedAt))
+                        .put(LogKey.COMMAND_SENT, stampJson(stop.commandSent)).put(LogKey.REPLY, stampJson(stop.replyAt))
+                        .put(LogKey.FLAG_CLEARED, stampJson(stop.flagClearedAt))
                         .put(LogKey.CLIP_SPAN, spanJson(span)),
                 )
             }
@@ -553,27 +554,27 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun writeMeta(s: Session, endUtc: Long?, fitWritten: Boolean, samples: Int, spans: Map<String, CameraSpan>, lags: Map<String, Long> = emptyMap()) {
         val cameras = JSONArray(
             s.cameras.map { (address, r) ->
-                JSONObject().put(LogKey.CAMERA, cameraLabel(address)).put("start_result", r::class.simpleName)
-                    .put(LogKey.FIT_SHIFT_MS, lags[address] ?: CameraTiming.fitShiftMs(CameraController.clockSet(address)))
+                JSONObject().put(LogKey.CAMERA, cameraLabel(address)).put(LogKey.START_RESULT, r::class.simpleName)
+                    .put(LogKey.CLOCK_LAG_MS, lags[address] ?: CameraTiming.fitShiftMs(CameraController.clockSet(address)))
                     .put(LogKey.CLIP_SPAN, spanJson(spans[address]))
             },
         )
         val json = JSONObject()
-            .put("format_version", 1)   // raise when a field changes meaning, so a reader can tell old rides from new
-            .put("app", packageName + " " + BuildConfigInfo.versionName(this))
-            .put("altitude_reference", if (Build.VERSION.SDK_INT >= 34) "msl" else "wgs84_ellipsoid")
-            .put("device", Build.MANUFACTURER + " " + Build.MODEL)
-            .put("android_sdk", Build.VERSION.SDK_INT)
+            .put(LogKey.FORMAT_VERSION, 1)   // raise when a field changes meaning, so a reader can tell old rides from new
+            .put(LogKey.APP, packageName + " " + BuildConfigInfo.versionName(this))
+            .put(LogKey.ALTITUDE_REFERENCE, if (Build.VERSION.SDK_INT >= 34) "msl" else "wgs84_ellipsoid")
+            .put(LogKey.DEVICE, Build.MANUFACTURER + " " + Build.MODEL)
+            .put(LogKey.ANDROID_SDK, Build.VERSION.SDK_INT)
             .put(LogKey.START_UTC_MS, s.startUtc)
-            .put("start_elapsed_ns", s.startElapsedNs)
+            .put(LogKey.START_ELAPSED_NS, s.startElapsedNs)
             .put(LogKey.END_UTC_MS, endUtc ?: JSONObject.NULL)
             .put(LogKey.GNSS_FIXES, s.fixes.size)
-            .put("imu_events_total", s.imuTotal)
-            .put("imu_events_by_sensor_type", JSONObject(s.imuCounts.mapKeys { it.key.toString() }))
+            .put(LogKey.IMU_EVENTS_TOTAL, s.imuTotal)
+            .put(LogKey.IMU_EVENTS_BY_SENSOR_TYPE, JSONObject(s.imuCounts.mapKeys { it.key.toString() }))
             .put(LogKey.PHONE_MINUS_GPS_MS, s.skewMs ?: JSONObject.NULL)
-            .put("cameras", cameras)
-            .put("fit_written", fitWritten)
-            .put("fit_samples", samples)
+            .put(LogKey.CAMERAS, cameras)
+            .put(LogKey.FIT_WRITTEN, fitWritten)
+            .put(LogKey.FIT_SAMPLES, samples)
         RideFolder.writeAtomically(File(s.dir, RideLog.META), json.toString(2).toByteArray())
     }
 

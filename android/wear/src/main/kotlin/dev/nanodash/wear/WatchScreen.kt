@@ -79,13 +79,13 @@ import kotlinx.coroutines.launch
 
 /** The phone app's tokens on true black, as in docs/WEAR_UI.md. */
 private object Tokens {
-    val ground = Color(0xFF000000)
+    val ground = Color(Palette.BLACK)
     val surface = Color(Palette.RAISED)
     val text = Color(Palette.TEXT)
     val textSecondary = Color(Palette.TEXT_SECONDARY)
     val textMuted = Color(Palette.TEXT_MUTED)
     val accent = Color(Palette.ACCENT)
-    val onAccent = Color(0xFF000000)
+    val onAccent = Color(Palette.ON_ACCENT_WATCH)
     val ok = Color(Palette.OK)
     val warn = Color(Palette.WARN)
     val bad = Color(Palette.BAD)

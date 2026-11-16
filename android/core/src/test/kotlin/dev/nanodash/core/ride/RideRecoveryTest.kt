@@ -115,6 +115,16 @@ class RideRecoveryTest {
     }
 
     @Test
+    fun aCameraStopLineBuiltFromTheLogKeysIsReadBackWithItsCameraShiftAndSkew() {
+        val line = """{"${LogKey.EVENT}":"${LogEvent.CAMERA_STOP}","${LogKey.CAMERA}":"Osmo Nano AA:1A:2B","${LogKey.FIT_SHIFT_MS}":-360,""" +
+            """"${LogKey.PHONE_MINUS_GPS_MS}":120,"${LogKey.CLIP_SPAN}":[1000,5000]}"""
+        assertEquals(
+            listOf(RideRecovery.CameraClip("Osmo Nano AA:1A:2B", CameraSpan(1000, 5000), -360, 120)),
+            RideRecovery.clipsFromEvents(line),
+        )
+    }
+
+    @Test
     fun readsOneClipWindowPerCamera() {
         val events = """
             {"event":"camera_stop","camera":"A","clip_span_estimate_utc_ms":[1000,5000]}
