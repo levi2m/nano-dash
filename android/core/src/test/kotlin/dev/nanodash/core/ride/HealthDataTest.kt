@@ -1,6 +1,5 @@
 package dev.nanodash.core.ride
 
-import dev.nanodash.core.fit.FitSport
 import dev.nanodash.core.fit.RideSample
 import java.io.File
 import java.nio.file.Files
@@ -76,17 +75,6 @@ class HealthDataTest {
         assertNull(HealthMerge.attach(listOf(sample(100)), listOf(HeartRateReading(t0, 90))).single().heartRateBpm)
     }
 
-    @Test
-    fun sportDefaultsToMotorcyclingAndOnlyOtherSportsAreStored() {
-        assertEquals(FitSport.MOTORCYCLING, RideSport.read(root))
-        RideSport.write(root, FitSport.CYCLING)
-        assertEquals(FitSport.CYCLING, RideSport.read(root))
-        RideSport.write(root, FitSport.MOTORCYCLING)
-        assertFalse(File(root, RideSport.FILE).exists())
-        File(root, RideSport.FILE).writeText("swimming\n")
-        assertEquals(FitSport.MOTORCYCLING, RideSport.read(root))
-    }
-
     private fun ride(): File {
         val dir = File(root, "ride").apply { mkdirs() }
         val header = "elapsed_ns,utc_ms,lat,lon,alt_m,speed_mps,bearing_deg,h_acc_m,speed_acc_mps,bearing_acc_deg,v_acc_m\n"
@@ -115,24 +103,12 @@ class HealthDataTest {
     }
 
     @Test
-    fun rebuildUsesTheRidesSport() {
-        val dir = ride()
-        RideFolder.rebuildFit(dir)
-        val motorcycling = File(dir, "ride.fit").readBytes()
-        RideSport.write(dir, FitSport.CYCLING)
-        RideFolder.rebuildFit(dir)
-        assertFalse(motorcycling.contentEquals(File(dir, "ride.fit").readBytes()))
-    }
-
-    @Test
-    fun theListCountsReadingsAndKnowsTheSportWithoutParsingTheFile() {
+    fun theListCountsReadingsWithoutParsingTheFile() {
         val dir = ride()
         RideFolder.rebuildFit(dir)
         RideFolder.saveHealth(dir, (0 until 12).map { HeartRateReading(t0 + it * 1000L, 90) })
-        RideSport.write(dir, FitSport.CYCLING)
         val summary = RideFolder.summarize(dir)
         assertEquals(12, summary.heartRateReadings)
-        assertEquals(FitSport.CYCLING, summary.sport)
         assertEquals(0, HealthCsv.count(File(root, "missing.csv")))
         File(root, "header-only.csv").writeText("utc_ms,heart_rate_bpm\n")
         assertEquals(0, HealthCsv.count(File(root, "header-only.csv")))
@@ -171,6 +147,30 @@ class HealthDataTest {
         val now = t0 + 86_400_000
         val rides = (0 until 8).map { summary(now - it * 60_000L - 600_000) }
         assertEquals(rides.take(HealthImport.MAX_RIDES), HealthImport.due(rides, now))
+    }
+
+    @Test
+    fun onlyReadingsInRangeAreWrittenSoTheCountMatchesTheFit() {
+        val readings = listOf(HeartRateReading(t0, 0), HeartRateReading(t0 + 1000, 80), HeartRateReading(t0 + 2000, 300))
+        assertEquals(listOf(HeartRateReading(t0 + 1000, 80)), HealthCsv.parse(HealthCsv.write(readings)))
+        val dir = ride()
+        RideFolder.saveHealth(dir, readings.filter { it.bpm !in HealthCsv.MIN_BPM..HealthCsv.MAX_BPM })
+        assertFalse(File(dir, HealthCsv.FILE).exists(), "nothing valid, so no file and no false 'done'")
+        RideFolder.saveHealth(dir, readings)
+        assertEquals(1, RideFolder.summarize(dir).heartRateReadings)
+    }
+
+    @Test
+    fun readingsMoveWithThePhoneMinusGpsOffsetLikeTheCameraSpans() {
+        val fixes = RideRecovery.parseGnssCsv(File(ride(), "gnss.csv").readText())
+        val readings = (0 until 30).map { HeartRateReading(t0 + it * 1000L, 100 + it) }
+        val plain = RideRecovery.buildFit(fixes, emptyList(), shiftMs = 0, phoneMinusGpsMs = 0, heartRate = readings)!!.bytes
+        // The phone clock is 3 s ahead of GPS: a reading stamped 3 s later on the phone is the same moment, so the file must not change.
+        val ahead = RideRecovery.buildFit(fixes, emptyList(), shiftMs = 0, phoneMinusGpsMs = 3000, heartRate = readings.map { it.copy(utcMillis = it.utcMillis + 3000) })!!.bytes
+        assertTrue(plain.contentEquals(ahead))
+        // The same readings with the offset not accounted for would land 3 s off.
+        val wrong = RideRecovery.buildFit(fixes, emptyList(), shiftMs = 0, phoneMinusGpsMs = 0, heartRate = readings.map { it.copy(utcMillis = it.utcMillis + 3000) })!!.bytes
+        assertFalse(plain.contentEquals(wrong))
     }
 
     @Test

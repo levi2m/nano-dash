@@ -1,6 +1,5 @@
 package dev.nanodash.core.ride
 
-import dev.nanodash.core.fit.FitSport
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -25,8 +24,6 @@ class RideSummary(
     val files: List<File>,
     /** Heart-rate readings added from Health Connect (the lines of `health.csv`); 0 when none were added. */
     val heartRateReadings: Int = 0,
-    /** The sport the ride's .fit declares (`sport.txt`). */
-    val sport: FitSport = FitSport.MOTORCYCLING,
 ) {
     /** `ride.fit`, or one `ride-<camera>.fit` per camera clock when the cameras' clocks differ. */
     val fits: List<File> get() = RideFolder.fitFiles(dir)
@@ -80,7 +77,6 @@ object RideFolder {
             route = track.route,
             files = files,
             heartRateReadings = HealthCsv.count(File(dir, HealthCsv.FILE)),
-            sport = RideSport.read(dir),
         )
     }
 
@@ -140,15 +136,16 @@ object RideFolder {
 
     /** Stores the readings as `health.csv` (replacing an earlier import) and does not touch the .fit; call [rebuildFit] after. */
     fun saveHealth(dir: File, readings: List<HeartRateReading>) {
-        if (readings.isEmpty()) File(dir, HealthCsv.FILE).delete()
-        else writeAtomically(File(dir, HealthCsv.FILE), HealthCsv.write(readings).toByteArray())
+        val kept = HealthCsv.clean(readings)
+        if (kept.isEmpty()) File(dir, HealthCsv.FILE).delete()
+        else writeAtomically(File(dir, HealthCsv.FILE), HealthCsv.write(kept).toByteArray())
     }
 
     /** Rebuilds every .fit from the logged fixes (for a ride that was interrupted, or after the writer improved), with the ride's health readings and sport. */
     fun rebuildFit(dir: File): Boolean {
         val gnss = File(dir, "gnss.csv").takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES } ?: return false
         val events = readTextCapped(File(dir, "events.jsonl"))
-        val fits = RideRecovery.rebuildFits(gnss.readText(), events, readTextCapped(File(dir, HealthCsv.FILE)), RideSport.read(dir)) ?: return false
+        val fits = RideRecovery.rebuildFits(gnss.readText(), events, readTextCapped(File(dir, HealthCsv.FILE))) ?: return false
         val keep = fits.map { it.fileName }.toSet()
         fits.forEach { writeAtomically(File(dir, it.fileName), it.bytes) }
         fitFiles(dir).filter { it.name !in keep }.forEach { it.delete() }   // old files go only after the new ones are in place

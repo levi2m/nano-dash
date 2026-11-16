@@ -20,7 +20,7 @@
     <!-- keeps the CPU awake so motion sensor events keep arriving with the screen off during a ride -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Heart rate from Health Connect (Android 14 and later), read only, asked for when the rider taps "Add heart rate" on a ride. -->
+    <!-- Heart rate from Health Connect (Android 14 and later), read only, asked for when the rider taps "Add health data" on a ride. -->
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
@@ -46,14 +46,23 @@
             </intent-filter>
         </activity>
 
-        <!-- Health Connect opens this to show why the app reads heart rate. It is text only and reads nothing from the intent. -->
+        <!-- The text-only screen that says why the app reads heart rate. Only the alias below reaches it from outside; it reads nothing from the intent. -->
         <activity
             android:name=".HealthRationaleActivity"
-            android:exported="true">
+            android:exported="false" />
+
+        <!-- Android 14 and later (the only versions the app reads Health Connect on): how Health Connect finds the privacy screen. Without this
+             entry it lists no permissions for the app and shows no request. Only the system can start it (the permission below). -->
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".HealthRationaleActivity">
             <intent-filter>
-                <action android:name="android.health.connect.action.SHOW_PERMISSIONS_RATIONALE" />
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <service
             android:name=".LoggerService"

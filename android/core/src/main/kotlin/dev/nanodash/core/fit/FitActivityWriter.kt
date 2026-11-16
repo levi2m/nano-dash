@@ -18,12 +18,6 @@ data class RideSample(
     val heartRateBpm: Int? = null,
 )
 
-/** The sport the .fit declares. Which one Mimo needs for its heart-rate widget is untested; see docs/HEALTH.md. */
-enum class FitSport(val code: Int) {
-    MOTORCYCLING(22),
-    CYCLING(2),
-}
-
 /** A span during which the camera was recording, in phone UTC. The .fit marks records inside it with `camera_recording = 1`. */
 data class CameraSpan(val startUtcMillis: Long, val endUtcMillis: Long)
 
@@ -39,7 +33,7 @@ data class CameraSpan(val startUtcMillis: Long, val endUtcMillis: Long)
  * Developer fields (developer data index 0): lean_angle, lateral_accel, longitudinal_accel, camera_recording.
  */
 class FitActivityWriter {
-    fun encode(samples: List<RideSample>, cameraSpans: List<CameraSpan> = emptyList(), sport: FitSport = FitSport.MOTORCYCLING): ByteArray {
+    fun encode(samples: List<RideSample>, cameraSpans: List<CameraSpan> = emptyList()): ByteArray {
         require(samples.isNotEmpty()) { "no samples" }
         val sorted = samples.sortedBy { it.utcMillis }
         // The heart_rate field is declared only when the ride has readings, so a ride without health data keeps the file it always had.
@@ -115,7 +109,7 @@ class FitActivityWriter {
         w.data(L_SESSION) {
             u16(0); u32(end); u32(start); u32(elapsedMs); u32(elapsedMs)
             u32((last.distanceM * 100.0).roundToLong().coerceIn(0, 0xFFFF_FFFEL))
-            u8(sport.code); u8(SUB_SPORT_GENERIC)
+            u8(SPORT_MOTORCYCLING); u8(SUB_SPORT_GENERIC)
             u32((avgSpeed * 1000.0).roundToLong().coerceIn(0, 0xFFFF_FFFEL))
             u32((maxSpeed * 1000.0).roundToLong().coerceIn(0, 0xFFFF_FFFEL))
             if (hasHeartRate) { u8(heartRates.average().roundToInt().coerceIn(1, 254)); u8(heartRates.max().coerceIn(1, 254)) }
@@ -152,6 +146,7 @@ class FitActivityWriter {
         // enum values from the FIT global profile
         private const val FILE_TYPE_ACTIVITY = 4
         private const val MANUFACTURER_DEVELOPMENT = 255
+        private const val SPORT_MOTORCYCLING = 22
         private const val SUB_SPORT_GENERIC = 0
         private const val FIT_UINT8_INVALID = 0xFF
         private const val ACTIVITY_TYPE_MANUAL = 0

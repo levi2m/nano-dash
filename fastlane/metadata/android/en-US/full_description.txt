@@ -1,22 +1,22 @@
-Nano Dash is a ride logger for the DJI Osmo Nano motorcycle camera. It starts and stops the camera over Bluetooth with your ride, logs GPS and motion on the phone, and writes a .fit file that DJI Mimo can attach to the footage as speed, route and elevation overlays. The phone can stay locked in your pocket.
+Nano Dash is a track logger for the DJI Osmo Nano camera, for any sport. It starts and stops the camera over Bluetooth with your recording, logs GPS and motion on the phone, and writes a .fit file that DJI Mimo can attach to the footage as speed, route and elevation overlays. The phone can stay locked in your pocket.
 
 <b>What it does</b>
 <ul>
-<li>Finds and pairs the camera, then starts and stops it with the ride. If the link drops it reconnects in the background.</li>
+<li>Finds and pairs the camera, then starts and stops it with the track. If the link drops it reconnects in the background.</li>
 <li>Sets the camera's clock to the phone's every time it connects, so the clips and the .fit share one time.</li>
-<li>Logs the ride with the screen off: GPS at 1 Hz, motion sensors and pressure.</li>
+<li>Logs the track with the screen off: GPS at 1 Hz, motion sensors and pressure.</li>
 <li>Writes a Mimo-importable .fit file with speed, route, elevation and estimated lean angle.</li>
 <li>Controls several Nanos at once.</li>
-<li>Opens a ride's route in a maps app of your choice as GPX.</li>
+<li>Opens a track's route in a maps app of your choice as GPX.</li>
 <li>Shows speed and distance in km or miles; you pick.</li>
 <li>Works with TalkBack and other screen readers: headings, spoken status and route descriptions, large touch targets, light and dark themes and large font sizes.</li>
 </ul>
 
 <b>Optional watch remote</b>
-There is also a Wear OS companion app that starts and stops a ride from your wrist. It is completely optional: Nano Dash does everything without it, and it is not part of this F-Droid build. It is a separate download on the project page and needs developer mode on the watch.
+There is also a Wear OS companion app that starts and stops a track from your wrist. It is completely optional: Nano Dash does everything without it, and it is not part of this F-Droid build. It is a separate download on the project page and needs developer mode on the watch.
 
 <b>Private by design</b>
-The app has no internet permission. Rides stay on your phone and leave only when you tap Share. There is no account, no analytics and no crash reporting. Backups and device transfers are switched off for the app.
+The app has no internet permission. Tracks stay on your phone and leave only when you tap Share. There is no account, no analytics and no crash reporting. Backups and device transfers are switched off for the app.
 
 <b>Good to know</b>
-DJI Mimo is needed once, at the end, to import the .fit file together with the clip. The app is unofficial and is not affiliated with, endorsed by or sponsored by DJI or Garmin. It is not for safety-critical use, and you should never operate your phone while riding: start the ride before you move off. It has been tested on one Osmo Nano and one Samsung phone, so other phones and cameras are welcome as compatibility reports on the project page.
+DJI Mimo is needed once, at the end, to import the .fit file together with the clip. The app is unofficial and is not affiliated with, endorsed by or sponsored by DJI or Garmin. It is not for safety-critical use, and you should never operate your phone while recording: start the track before you move off. It has been tested on one Osmo Nano and one Samsung phone, so other phones and cameras are welcome as compatibility reports on the project page.

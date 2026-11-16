@@ -4,12 +4,12 @@ Companion to [WEAR_OS.md](WEAR_OS.md). That file says how the watch talks to the
 
 ## 1. Who and when
 
-A rider who has already decided to ride. They glance at the wrist for half a second, in wind and vibration, often in gloves. So:
+A user who has already decided to track. They glance at the wrist for half a second, in wind and vibration, often in gloves. So:
 
 - **One job per screen, one thing that leads.** The middle of the screen holds a single hero: the word "Ready", then the running time, then a spinner. Nothing else competes with it.
 - **Three words of text at most** around the hero. Status is carried by a dot plus a word, never by colour alone.
 - **Big targets.** The main button is an edge button across the bottom, at least 60 dp tall (Wear's own minimum is 48 dp; gloves need more).
-- **Stopping is deliberate, starting is easy.** Start is one tap. Stop is press and hold, so a bump of the wrist cannot end a ride.
+- **Stopping is deliberate, starting is easy.** Start is one tap. Stop is press and hold, so a bump of the wrist cannot end a track.
 - **Every confirmation is felt, not only seen.** A glove hides the screen but not a buzz.
 
 ## 2. Design tokens
@@ -39,16 +39,16 @@ Reused from the phone app so the two feel like one product, with one deliberate 
 | # | State | Hero | Status line | Button |
 |---|---|---|---|---|
 | 1 | Phone not reachable | "No phone" | "Open Nano Dash on the phone" | Try again |
-| 2 | Ready, camera ready | "Ready" | dot green: "Camera ready" | Start ride |
-| 3 | Ready, no camera | "Ready" | dot grey: "No camera" | Start ride |
+| 2 | Ready, camera ready | "Ready" | dot green: "Camera ready" | Start tracking |
+| 3 | Ready, no camera | "Ready" | dot grey: "No camera" | Start tracking |
 | 4 | Starting (request sent) | spinner | none | none (disabled) |
 | 5 | Recording | the running time, in ember | GPS dot + word, camera dot + word | Hold to stop |
 | 6 | Stopping (finger down) | the running time | GPS and camera dots | the button fills red from the left while held |
-| 7 | Saving | spinner | "Saving ride" | none |
+| 7 | Saving | spinner | "Saving track" | none |
 | 8 | Saved (shown for 2 seconds) | "Saved" | none | none |
 | 9 | Error | the reason, short | what to do | Try again |
 
-Starting with no camera is allowed (state 3), exactly as on the phone: the ride is still logged, there is just no video.
+Starting with no camera is allowed (state 3), exactly as on the phone: the track is still logged, there is just no video.
 
 ### Layouts (round screen, not to scale)
 
@@ -68,9 +68,9 @@ Starting with no camera is allowed (state 3), exactly as on the phone: the ride 
 
 - **Start:** one tap. State 4 until the phone confirms. Haptic: two short pulses on success.
 - **Stop:** press and hold the button for 1.2 seconds. The button fills red from the left as you hold, with a light tick at the start. Letting go early cancels, with no message. When it is full: one long pulse, then state 7. If the phone does not confirm (link lost), the button re-arms after 3 seconds so you can hold again. A command that waited more than 5 seconds for the link is dropped, never sent late.
-- **Hands off:** the app does not keep the screen on and has no ambient screen of its own. When the wrist drops, Wear OS leaves the app and the link pauses; the ride on the phone is unaffected, and the screen is current again when you raise your wrist.
-- **Reconnect:** if the phone link drops during a ride, the screen shows state 1, and the ride on the phone keeps going. When the link returns, the screen goes straight back to state 5. Losing the watch never affects the ride.
-- **Back and swipe:** the system swipe-to-dismiss works at every state and never changes a ride.
+- **Hands off:** the app does not keep the screen on and has no ambient screen of its own. When the wrist drops, Wear OS leaves the app and the link pauses; the track on the phone is unaffected, and the screen is current again when you raise your wrist.
+- **Reconnect:** if the phone link drops during a track, the screen shows state 1, and the track on the phone keeps going. When the link returns, the screen goes straight back to state 5. Losing the watch never affects the track.
+- **Back and swipe:** the system swipe-to-dismiss works at every state and never changes a track.
 
 ## 5. Copy
 
@@ -83,8 +83,8 @@ Plain words, sentence case, no em dashes, short enough for a 1.47 inch screen. E
 | Hero, ready | Ready |
 | Status, camera | Camera ready / No camera / Camera recording / Camera problem |
 | Status, GPS | GPS fix / GPS searching |
-| Buttons | Start ride / Hold to stop / Try again |
-| Saving | Saving ride |
+| Buttons | Start tracking / Hold to stop / Try again |
+| Saving | Saving track |
 | Saved | Saved |
 | Error: location off | Location is off. Switch it on in the phone's settings |
 | Error: no permission | No location access. Allow it in the Nano Dash app |
@@ -96,8 +96,8 @@ Plain words, sentence case, no em dashes, short enough for a 1.47 inch screen. E
 
 - **Contrast:** every pair in the token table is above 5.7:1. The hold-to-stop label is drawn twice, light on the dark pill and black on the red fill, with the red layer clipped to the progress, so the text is at least 6.29:1 (black on #F2575C) or 13.4:1 (light on #232325) at every moment of the hold.
 - **Touch targets:** the main button is at least 64 dp tall and grows with the font; nothing else is tappable. The secondary pill has a 1 dp #85858B outline (5.73:1 on black) so it is visible on the black ground.
-- **TalkBack, Stop:** a single activation must **not** stop the ride (owner decision, it keeps the accidental-stop guard). The button is spoken as "Hold to stop" (the visible text) with the state "Hold for about a second". Its click action is a deliberate no-op labelled "Use the Stop ride action to stop"; only the Actions menu entry **"Stop ride"** (long click) or a real press-and-hold stops the ride.
-- **TalkBack, status:** every screen has a pane title. "Saved" and the error messages are assertive live regions, "Ready", the spinners ("Starting ride", "Saving ride") and other messages are polite ones. Titles, "Ready" and the timer are headings. The timer is one merged node, "Riding for 12 minutes 45 seconds", with no live region (it would read every second). The status dots read as their words.
+- **TalkBack, Stop:** a single activation must **not** stop the track (owner decision, it keeps the accidental-stop guard). The button is spoken as "Hold to stop" (the visible text) with the state "Hold for about a second". Its click action is a deliberate no-op labelled "Use the Stop tracking action to stop"; only the Actions menu entry **"Stop tracking"** (long click) or a real press-and-hold stops the track.
+- **TalkBack, status:** every screen has a pane title. "Saved" and the error messages are assertive live regions, "Ready", the spinners ("Starting track", "Saving track") and other messages are polite ones. Titles, "Ready" and the timer are headings. The timer is one merged node, "Recording for 12 minutes 45 seconds", with no live region (it would read every second). The status dots read as their words.
 - **Allow Bluetooth** uses the same pill (Button role) and message layout as the other screens.
 - **Not colour alone:** every dot has a word beside it.
 - **Large text:** pills are at least 64 dp and grow, labels wrap, status words wrap, the message text scrolls above the button. The timer and the hero word follow the font scale up to 1.3x and then stop growing, so they fit a round screen. Reasoned, not yet tried on a device at 1.3x and 2x. The TalkBack behaviour above was reasoned from the source and installed on the watch; the owner has not confirmed it with TalkBack yet.
@@ -106,7 +106,7 @@ Plain words, sentence case, no em dashes, short enough for a 1.47 inch screen. E
 
 ## 7. Not in the first version
 
-Speed, a map, heart rate, a complication, and a tile that shows the ride state (the built tile only opens the app, see WEAR_OS.md section 15). Each is a separate decision, because the half-second glance is the product.
+Speed, a map, heart rate, a complication, and a tile that shows the track state (the built tile only opens the app, see WEAR_OS.md section 15). Each is a separate decision, because the half-second glance is the product.
 
 ## 8. What changed while building (build 40)
 
@@ -114,5 +114,5 @@ Speed, a map, heart rate, a complication, and a tile that shows the ride state (
 - **Wear OS 4 (API 31) is the minimum.** The vibration and Bluetooth permission APIs the app uses start there, and supporting Wear OS 3 as well was not worth the extra code.
 - **No ambient screen of its own.** Wear OS leaves the app as it is and the watch's own timeout takes over.
 - **Spinner and pill buttons are drawn by the app** (the pill is 64 dp tall and 78 percent of the width), instead of using the library's edge button, so their size and feel are exactly as specified.
-- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: start, the running screen, hold to stop, and the saved ride all work (build 40, and again on build 46).
-- **Accessibility pass:** the hold-to-stop label is spoken as "Hold to stop" and never stops the ride on a single TalkBack activation; the label is two-colour so it stays readable while the red fills; state changes are announced (live regions, pane titles, headings); the spinner is still when animations are off; pills grow with the font; the secondary pill has an outline; the Allow pill is a proper button. Details in section 6.
+- **Tested** by the maintainer on a Galaxy Watch6 Classic with a Galaxy S25 Ultra: start, the running screen, hold to stop, and the saved track all work (build 40, and again on build 46).
+- **Accessibility pass:** the hold-to-stop label is spoken as "Hold to stop" and never stops the track on a single TalkBack activation; the label is two-colour so it stays readable while the red fills; state changes are announced (live regions, pane titles, headings); the spinner is still when animations are off; pills grow with the font; the secondary pill has an outline; the Allow pill is a proper button. Details in section 6.

@@ -24,7 +24,7 @@ class ManifestPolicyTest {
 
     private fun exportedComponents(doc: org.w3c.dom.Document): Map<String, String> {
         val exported = mutableMapOf<String, String>()
-        for (tag in listOf("activity", "service", "receiver", "provider")) {
+        for (tag in listOf("activity", "activity-alias", "service", "receiver", "provider")) {
             val nodes = doc.getElementsByTagName(tag)
             for (i in 0 until nodes.length) {
                 val attrs = nodes.item(i).attributes
@@ -48,18 +48,19 @@ class ManifestPolicyTest {
     fun theWatchAppHasNoNetworkPermissionAndNoBackup() = assertNoNetworkNoBackup(parse(File(wear, "AndroidManifest.xml")))
 
     @Test
-    fun onlyTheLauncherAndTheHealthRationaleActivitiesAreExported() {
+    fun onlyTheLauncherAndTheSystemOnlyHealthEntryAreExported() {
         val doc = parse(File(main, "AndroidManifest.xml"))
         assertEquals(
-            mapOf(".MainActivity" to "true", ".HealthRationaleActivity" to "true", ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false"),
+            mapOf(
+                ".MainActivity" to "true", ".HealthRationaleActivity" to "false", ".ViewPermissionUsageActivity" to "true",
+                ".LoggerService" to "false", "androidx.core.content.FileProvider" to "false",
+            ),
             exportedComponents(doc),
         )
-        // The rationale screen answers only Health Connect's own action.
-        val activities = doc.getElementsByTagName("activity")
-        val rationale = (0 until activities.length).map { activities.item(it) }
-            .single { it.attributes.getNamedItemNS(androidNs, "name").nodeValue == ".HealthRationaleActivity" } as org.w3c.dom.Element
-        val actions = rationale.getElementsByTagName("action")
-        assertEquals(listOf("android.health.connect.action.SHOW_PERMISSIONS_RATIONALE"), (0 until actions.length).map { actions.item(it).attributes.getNamedItemNS(androidNs, "name").nodeValue })
+        // Android 14's entry for the same screen can be started only by the system.
+        val alias = doc.getElementsByTagName("activity-alias").item(0).attributes
+        assertEquals("android.permission.START_VIEW_PERMISSION_USAGE", alias.getNamedItemNS(androidNs, "permission").nodeValue)
+        assertEquals(".HealthRationaleActivity", alias.getNamedItemNS(androidNs, "targetActivity").nodeValue)
     }
 
     @Test

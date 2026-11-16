@@ -296,7 +296,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         val s = try {
             Session(dir, startUtc, startElapsed)
         } catch (e: IOException) {
-            RideStore.update { it.copy(message = Note("Could not create the ride files: ${e.message}")) }
+            RideStore.update { it.copy(message = Note("Could not create the track files: ${e.message}")) }
             backToIdle()
             return
         }
@@ -327,7 +327,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         }
 
         RideStore.update { RideUiState(recording = true, startedUtcMillis = startUtc) }
-        notify("Recording a ride")
+        notify("Recording a track")
         startCamera(s)
     }
 
@@ -340,7 +340,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun startCamera(s: Session) {
         s.cameraJob = CameraController.scope.launch {
             if (CameraController.readyIds().isEmpty()) {
-                RideStore.update { it.copy(cameraNote = Note("Camera not connected, so this ride has no video.")) }
+                RideStore.update { it.copy(cameraNote = Note("Camera not connected, so this track has no video.")) }
                 s.event(JSONObject().put("event", "camera_not_ready"))
             } else {
                 RideStore.update { it.copy(cameraNote = Note("Starting the camera", problem = false)) }
@@ -392,14 +392,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         thread = null
         // Until the thread below is done, a new ride must not start: its end would switch this service off under the new ride.
         saving = true
-        RideStore.update { it.copy(recording = false, saving = true, message = Note("Saving the ride", problem = false)) }
-        notify("Saving the ride")
+        RideStore.update { it.copy(recording = false, saving = true, message = Note("Saving the track", problem = false)) }
+        notify("Saving the track")
 
         Thread {
             try {
                 finishRide(s)
             } catch (e: Throwable) {
-                RideStore.update { it.copy(message = Note("Could not finish the ride: ${e.message}. The GPS log was kept; use Rebuild .fit.")) }
+                RideStore.update { it.copy(message = Note("Could not finish the track: ${e.message}. The GPS log was kept; use Rebuild .fit.")) }
             } finally {
                 // On the main thread, in one step: a Start there between clearing `saving` and backToIdle() would begin a ride that backToIdle then kills.
                 main.post {
@@ -471,10 +471,10 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                 built.forEach { RideFolder.writeAtomically(File(s.dir, it.fileName), it.bytes) }
                 samples = built.first().samples
                 written = true
-                message = Note(if (built.size == 1) "Saved ${samples} s of ride to ride.fit" else "Saved ${samples} s of ride, one .fit for each camera's clock", problem = false)
+                message = Note(if (built.size == 1) "Saved ${samples} s of track to ride.fit" else "Saved ${samples} s of track, one .fit for each camera's clock", problem = false)
             }
         } catch (e: Exception) {
-            message = Note("Could not write the ride: ${e.message}")
+            message = Note("Could not write the track: ${e.message}")
         }
         writeMeta(s, endUtc, written, samples, spans)
         RideStore.update { it.copy(message = message) }
@@ -587,7 +587,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun ensureChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Ride logging", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Track logging", NotificationManager.IMPORTANCE_LOW))
         }
         if (nm.getNotificationChannel(READY_CHANNEL_ID) == null) {
             nm.createNotificationChannel(NotificationChannel(READY_CHANNEL_ID, "Quick start", NotificationManager.IMPORTANCE_LOW))
@@ -603,13 +603,13 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         // A locked phone must not start a ride from the notification shade: Android asks for the unlock first (API 31 and later, where Android offers this;
         // older versions cannot require it). The watch's Start is different on purpose: the rider's
         // phone is locked in a pocket, so LoggerService.watchStart does not require an unlock.
-        val startAction = NotificationCompat.Action.Builder(0, "Start ride", start)
+        val startAction = NotificationCompat.Action.Builder(0, "Start tracking", start)
             .apply { if (Build.VERSION.SDK_INT >= 31) setAuthenticationRequired(true) }
             .build()
         return NotificationCompat.Builder(this, READY_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle("Nano Dash is ready")
-            .setContentText("Start a ride here or from your watch")
+            .setContentText("Start a track here or from your watch")
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(open)

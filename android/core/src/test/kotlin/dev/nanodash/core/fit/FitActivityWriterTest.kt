@@ -209,10 +209,9 @@ class FitActivityWriterTest {
     }
 
     @Test
-    fun sessionCarriesAverageAndMaxHeartRateAndTheChosenSport() {
+    fun sessionCarriesAverageAndMaxHeartRate() {
         val ride = syntheticRide().map { it.copy(heartRateBpm = if (it.utcMillis == start + 5_000) 180 else 120) }
-        val session = ParsedFit(FitActivityWriter().encode(ride, sport = FitSport.CYCLING)).of(18).single().fields
-        assertEquals(2, session.getValue(5)[0].toInt())                        // cycling
+        val session = ParsedFit(FitActivityWriter().encode(ride)).of(18).single().fields
         assertEquals(121, session.getValue(16)[0].toInt() and 0xFF)            // (119 * 120 + 180) / 120 = 120.5, rounds to 121
         assertEquals(180, session.getValue(17)[0].toInt() and 0xFF)
     }

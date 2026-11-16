@@ -1,6 +1,7 @@
 package dev.nanodash.logger
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.health.connect.HealthConnectException
 import android.health.connect.HealthConnectManager
@@ -36,6 +37,13 @@ object HealthConnectReader {
             SdkExtensions.getExtensionVersion(Build.VERSION_CODES.UPSIDE_DOWN_CAKE) >= EXTENSION &&
             context.getSystemService(SERVICE) != null
 
+    /** Opens this app's page in Health Connect, where the permission can be allowed even if Android's own request was skipped. */
+    fun openSettings(context: Context) {
+        runCatching {
+            context.startActivity(Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS").putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName))
+        }
+    }
+
     fun granted(context: Context): Boolean = context.checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED
 
     /**
@@ -69,8 +77,10 @@ object HealthConnectReader {
             val out = ArrayList<HeartRateReading>()
             var token = 0L
             repeat(MAX_PAGES) {
-                val request = ReadRecordsRequestUsingFilters.Builder(HeartRateRecord::class.java)
-                    .setTimeRangeFilter(filter).setAscending(true).setPageSize(PAGE_SIZE).setPageToken(token).build()
+                // Health Connect refuses a request that has both a page token and a sort order, so neither is set on the first page and only the token on the next ones; the samples are sorted below.
+                val builder = ReadRecordsRequestUsingFilters.Builder(HeartRateRecord::class.java).setTimeRangeFilter(filter).setPageSize(PAGE_SIZE)
+                if (token != 0L) builder.setPageToken(token)
+                val request = builder.build()
                 val response = readPage(context, manager, request)
                 for (record in response.records) for (s in record.samples) {
                     val t = s.time.toEpochMilli()

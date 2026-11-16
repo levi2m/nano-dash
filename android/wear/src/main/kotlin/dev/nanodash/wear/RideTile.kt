@@ -16,7 +16,7 @@ import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.ListenableFuture
 
 /**
- * One swipe from the watch face to the remote: a single round "Ride" button that opens the app.
+ * One swipe from the watch face to the remote: a single round "Track" button that opens the app.
  * shortcut: the tile shows no ride state, because it cannot hold the phone link; the app connects within about two
  * seconds of opening. Upgrade only if riders ask to see the state without opening the app.
  */
@@ -37,10 +37,10 @@ class RideTile : TileService() {
                 ModifiersBuilders.Modifiers.Builder()
                     .setClickable(open)
                     .setBackground(ModifiersBuilders.Background.Builder().setColor(argb(0xFFFF7A1A.toInt())).setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(48f)).build()).build())
-                    .setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription("Open Nano Dash to start or stop a ride").build())
+                    .setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription("Open Nano Dash to start or stop a track").build())
                     .build(),
             )
-            .addContent(text("Ride", 20f, 0xFF000000.toInt(), bold = true))
+            .addContent(text("Track", 20f, 0xFF000000.toInt(), bold = true))
             .build()
 
         val root = LayoutElementBuilders.Box.Builder()

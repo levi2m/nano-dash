@@ -148,8 +148,8 @@ fun WatchApp(link: PhoneLink, haptics: Haptics) {
                 val (title, hint) = refusalText(refusal!!)
                 Message(title, hint, "Try again", isError = true) { refusal = null }
             }
-            starting -> Spinner(null, "Starting ride")
-            state.ride == RideState.Saving -> Spinner("Saving ride", "Saving ride")
+            starting -> Spinner(null, "Starting track")
+            state.ride == RideState.Saving -> Spinner("Saving track", "Saving track")
             now < savedUntil -> Hero("Saved", LiveRegionMode.Assertive)
             state.ride == RideState.Recording -> Recording(state, onTick = haptics::holdTick) {
                 haptics.stopped()
@@ -184,7 +184,7 @@ private fun Ready(camera: CameraState, onStart: () -> Unit) {
         }
         Box(Modifier.align(Alignment.Center)) { Hero("Ready", LiveRegionMode.Polite) }
         Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp)) {
-            PillButton("Start ride", Tokens.accent, Tokens.onAccent, onClick = onStart)
+            PillButton("Start tracking", Tokens.accent, Tokens.onAccent, onClick = onStart)
         }
     }
 }
@@ -213,7 +213,7 @@ private fun Recording(state: WatchState, onTick: () -> Unit, onStop: () -> Unit)
         // No live region here: it would read out every second.
         Box(Modifier.align(Alignment.Center).semantics(mergeDescendants = true) {
             heading()
-            contentDescription = "Riding for ${WatchFormat.spoken(state.elapsedSeconds)}"
+            contentDescription = "Recording for ${WatchFormat.spoken(state.elapsedSeconds)}"
         }) {
             Text(
                 WatchFormat.elapsed(state.elapsedSeconds),
@@ -335,7 +335,7 @@ internal fun PillButton(label: String, container: Color, content: Color, outline
  *
  * Screen readers (decision of the owner): a single TalkBack activation must NOT stop the ride. The spoken name is the visible
  * text ("Hold to stop"); the click action is a deliberate no-op whose label says where the real action is; only the Actions menu
- * entry "Stop ride" (long click) or the real press-and-hold stops it, so the accidental-stop guard stays.
+ * entry "Stop tracking" (long click) or the real press-and-hold stops it, so the accidental-stop guard stays.
  *
  * Contrast: the label is drawn twice, light on the dark pill and black on the red fill, and the red layer is clipped to the progress,
  * so every part of the text always sits on its own background (light on #232325 13.4:1, black on #F2575C 6.29:1).
@@ -358,8 +358,8 @@ private fun HoldToStop(onTick: () -> Unit, onStop: () -> Unit) {
                 role = Role.Button
                 contentDescription = "Hold to stop"
                 stateDescription = "Hold for about a second"
-                onClick(label = "Use the Stop ride action to stop") { true }
-                onLongClick(label = "Stop ride") { if (!fired) { fired = true; onStop() }; true }
+                onClick(label = "Use the Stop tracking action to stop") { true }
+                onLongClick(label = "Stop tracking") { if (!fired) { fired = true; onStop() }; true }
             }
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {

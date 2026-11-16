@@ -35,11 +35,11 @@ class HealthRationaleActivity : ComponentActivity() {
                 ) {
                     SectionLabel("Heart rate from Health Connect")
                     Text(
-                        "When you tap \"Add heart rate\" on a ride, Nano Dash reads the heart rate your watch recorded between the start and the end of that ride " +
-                            "and writes it into that ride's .fit file, so DJI Mimo can show it with the clip.\n\n" +
-                            "It reads heart rate only, and it never writes to Health Connect. The readings are saved in the ride's folder on this phone as health.csv. " +
-                            "Nano Dash has no internet permission, so nothing is sent anywhere unless you share the ride yourself. " +
-                            "Delete ride removes them. You can take the permission back in Health Connect at any time.",
+                        "When you tap \"Add health data\" on a track, Nano Dash reads the heart rate your watch recorded between the start and the end of that track " +
+                            "and writes it into that track's .fit file, so DJI Mimo can show it with the clip.\n\n" +
+                            "It reads heart rate only, and it never writes to Health Connect. The readings are saved in the track's folder on this phone as health.csv. " +
+                            "Nano Dash has no internet permission, so nothing is sent anywhere unless you share the track yourself. " +
+                            "Delete track removes them. You can take the permission back in Health Connect at any time.",
                         Modifier.padding(top = Space.s, bottom = Space.l),
                         style = NanoText.body,
                         color = nanoColors.textSecondary,

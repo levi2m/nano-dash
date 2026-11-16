@@ -1,6 +1,5 @@
 package dev.nanodash.core.ride
 
-import dev.nanodash.core.fit.FitSport
 import dev.nanodash.core.fit.RideSample
 import java.io.File
 
@@ -19,8 +18,11 @@ object HealthCsv {
     const val MIN_BPM = 30
     const val MAX_BPM = 250
 
+    /** Only the readings in range, so the file and the .fit agree on what a reading is (a watch can write 0 bpm for a stretch with no pulse). */
+    fun clean(readings: List<HeartRateReading>): List<HeartRateReading> = readings.filter { it.bpm in MIN_BPM..MAX_BPM }
+
     fun write(readings: List<HeartRateReading>): String =
-        HEADER + "\n" + readings.sortedBy { it.utcMillis }.joinToString("") { "${it.utcMillis},${it.bpm}\n" }
+        HEADER + "\n" + clean(readings).sortedBy { it.utcMillis }.joinToString("") { "${it.utcMillis},${it.bpm}\n" }
 
     /** How many readings the file holds, counted by lines without parsing them (the ride list asks for every ride on every refresh). 0 when there is no file. */
     fun count(file: File): Int =
@@ -85,18 +87,5 @@ object HealthImport {
     fun due(rides: List<RideSummary>, nowMs: Long): List<RideSummary> {
         val cutoff = nowMs - DAYS * 86_400_000L
         return rides.filter { it.hasFit && it.fixes > 0 && it.heartRateReadings == 0 && it.startUtcMillis + (it.durationSeconds ?: 0) * 1000 > cutoff }.take(MAX_RIDES)
-    }
-}
-
-/** Which sport the ride's .fit declares, kept as a one-word file (`sport.txt`) in the ride folder. Missing means motorcycling. */
-object RideSport {
-    const val FILE = "sport.txt"
-
-    fun read(dir: File): FitSport =
-        File(dir, FILE).takeIf { it.isFile && it.length() < 64 }?.readText()?.trim()?.uppercase()
-            ?.let { name -> FitSport.entries.firstOrNull { it.name == name } } ?: FitSport.MOTORCYCLING
-
-    fun write(dir: File, sport: FitSport) {
-        if (sport == FitSport.MOTORCYCLING) File(dir, FILE).delete() else File(dir, FILE).writeText(sport.name.lowercase() + "\n")
     }
 }
