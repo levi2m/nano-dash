@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -66,8 +65,8 @@ object CameraController {
     private val _ui = MutableStateFlow(CameraUi())
     val ui: StateFlow<CameraUi> = _ui.asStateFlow()
 
-    /** The cameras that are ready now, each time that set changes. */
-    val readyAddresses: Flow<Set<String>> = _ui.map { ui -> ui.rows.filter { it.ready }.map { it.address }.toSet() }.distinctUntilChanged()
+    /** The cameras that look ready, emitted again on every camera state change, so a start that found one not yet ready is tried again. */
+    val readyAddresses: Flow<Set<String>> = _ui.map { ui -> ui.rows.filter { it.ready }.map { it.address }.toSet() }
 
     @Volatile private var fleet: CameraFleet? = null
     private val rows = LinkedHashMap<String, CameraRow>()

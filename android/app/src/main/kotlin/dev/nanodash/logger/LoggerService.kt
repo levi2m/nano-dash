@@ -231,12 +231,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 
     // The watch Start is deliberately allowed while the phone is locked (the rider's phone is in a pocket); the notification's Start is not.
     private fun watchStart(): String {
-        val decision = ServiceRules.watchStart(
-            serviceState(),
-            stopPending,
-            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED,
-            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER),
-        )
+        val gps = GpsReadiness.of(this)
+        val decision = ServiceRules.watchStart(serviceState(), stopPending, gps != GpsReadiness.NeedsPermission, gps == GpsReadiness.Ready)
         return when (decision) {
             WatchStartDecision.AlreadyRiding -> WatchProtocol.OK
             is WatchStartDecision.Refuse -> WatchProtocol.err(decision.reason)
@@ -281,13 +277,10 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             return
         }
 
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            RideStore.update { it.copy(message = Note("Location permission is missing.", needsSettings = true)) }
-            backToIdle()
-            return
-        }
-        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-            RideStore.update { it.copy(message = Note("Location is switched off in the phone's settings.")) }
+        val gps = GpsReadiness.of(this)
+        if (gps != GpsReadiness.Ready) {
+            val note = if (gps == GpsReadiness.NeedsPermission) Note("Location permission is missing.", needsSettings = true) else Note("Location is switched off in the phone's settings.")
+            RideStore.update { it.copy(message = note) }
             backToIdle()
             return
         }
@@ -349,7 +342,10 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             }
             CameraController.readyAddresses.collect { ready ->
                 val late = ready - s.cameras.keys
-                if (late.isNotEmpty()) withContext(NonCancellable) { recordStarts(s, CameraController.startRecording(late)) }
+                if (late.isEmpty()) return@collect
+                // A camera that looks ready here but is not yet ready for the link answers nothing and stays unstarted: the next state change tries it again.
+                val started = withContext(NonCancellable) { CameraController.startRecording(late) }
+                if (started.isNotEmpty()) recordStarts(s, started)
             }
         }
     }

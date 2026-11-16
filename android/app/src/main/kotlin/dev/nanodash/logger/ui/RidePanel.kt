@@ -1,9 +1,5 @@
 package dev.nanodash.logger.ui
 
-import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,11 +18,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import androidx.core.location.LocationManagerCompat
 import dev.nanodash.core.ride.SpeedUnit
 import dev.nanodash.core.watch.WatchFormat
 import dev.nanodash.logger.CameraUi
+import dev.nanodash.logger.GpsReadiness
 import dev.nanodash.logger.RideUiState
 import dev.nanodash.logger.ui.components.ButtonKind
 import dev.nanodash.logger.ui.components.Hairline
@@ -130,13 +125,4 @@ internal fun ActionArea(ui: RideUiState, onStart: () -> Unit, onStop: () -> Unit
             NanoButton("Open app settings", onOpenSettings, Modifier.fillMaxWidth(), ButtonKind.Secondary)
         }
     }
-}
-
-/** Whether the phone can give a GPS fix right now, so the rider hears about a switched-off location before the ride, not after. */
-internal enum class GpsReadiness { Ready, LocationOff, NeedsPermission }
-
-internal fun gpsReadiness(context: Context): GpsReadiness = when {
-    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED -> GpsReadiness.NeedsPermission
-    !LocationManagerCompat.isLocationEnabled(context.getSystemService(Context.LOCATION_SERVICE) as LocationManager) -> GpsReadiness.LocationOff
-    else -> GpsReadiness.Ready
 }

@@ -57,6 +57,7 @@ import dev.nanodash.core.ride.SpeedUnit
 import dev.nanodash.logger.AppPrefs
 import dev.nanodash.logger.BuildConfigInfo
 import dev.nanodash.logger.CameraController
+import dev.nanodash.logger.GpsReadiness
 import dev.nanodash.logger.HealthConnectReader
 import dev.nanodash.logger.LoggerService
 import dev.nanodash.logger.Note
@@ -95,7 +96,7 @@ fun LoggerScreen() {
     var gps by remember { mutableStateOf(GpsReadiness.Ready) }
     var resumes by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) {
-        gps = gpsReadiness(context)
+        gps = GpsReadiness.of(context)
         resumes++
         onPauseOrDispose { }
     }
