@@ -94,10 +94,10 @@ class HealthDataTest {
         assertEquals(30, RideFolder.summarize(dir).heartRateReadings)
         assertTrue(RideFolder.rebuildFit(dir))
         assertTrue(File(dir, "ride.fit").readBytes().size > plain.size, "heart_rate adds bytes to every record")
-        assertTrue(RideFolder.summarize(dir).files.any { it.name == HealthCsv.FILE })
+        assertTrue(RideFolder.summarize(dir).files.any { it.name == RideLog.HEALTH })
 
         RideFolder.saveHealth(dir, emptyList())
-        assertFalse(File(dir, HealthCsv.FILE).exists())
+        assertFalse(File(dir, RideLog.HEALTH).exists())
         assertTrue(RideFolder.rebuildFit(dir))
         assertTrue(plain.contentEquals(File(dir, "ride.fit").readBytes()))
     }
@@ -155,14 +155,14 @@ class HealthDataTest {
         assertEquals(listOf(HeartRateReading(t0 + 1000, 80)), HealthCsv.parse(HealthCsv.write(readings)))
         val dir = ride()
         RideFolder.saveHealth(dir, readings.filter { it.bpm !in HealthCsv.MIN_BPM..HealthCsv.MAX_BPM })
-        assertFalse(File(dir, HealthCsv.FILE).exists(), "nothing valid, so no file and no false 'done'")
+        assertFalse(File(dir, RideLog.HEALTH).exists(), "nothing valid, so no file and no false 'done'")
         RideFolder.saveHealth(dir, readings)
         assertEquals(1, RideFolder.summarize(dir).heartRateReadings)
     }
 
     @Test
     fun readingsMoveWithThePhoneMinusGpsOffsetLikeTheCameraSpans() {
-        val fixes = RideRecovery.parseGnssCsv(File(ride(), "gnss.csv").readText())
+        val fixes = GnssCsv.parse(File(ride(), "gnss.csv").readText())
         val readings = (0 until 30).map { HeartRateReading(t0 + it * 1000L, 100 + it) }
         val plain = RideRecovery.buildFit(fixes, emptyList(), shiftMs = 0, phoneMinusGpsMs = 0, heartRate = readings)!!.bytes
         // The phone clock is 3 s ahead of GPS: a reading stamped 3 s later on the phone is the same moment, so the file must not change.

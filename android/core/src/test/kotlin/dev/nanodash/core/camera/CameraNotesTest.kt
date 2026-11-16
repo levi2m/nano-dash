@@ -9,8 +9,8 @@ import kotlin.test.assertTrue
 class CameraNotesTest {
     private val t = Stamp(1, 1)
     private val ok = StartResult.Started(t, t, t)
-    private fun row(a: String, text: String = "Camera ready", ready: Boolean = true, busy: Boolean = false, error: Boolean = false, rec: Boolean? = null) =
-        CameraRow(a, text, ready, busy, error, rec)
+    private fun row(a: String, text: String = "Camera ready", ready: Boolean = true, busy: Boolean = false, error: Boolean = false, rec: Boolean? = null, approve: Boolean = false) =
+        CameraRow(a, text, ready, busy, error, rec, awaitingApproval = approve)
 
     @Test
     fun oneCameraReadsAsItself() {
@@ -31,9 +31,9 @@ class CameraNotesTest {
 
     @Test
     fun theApprovalPromptWinsAndNamesTheCameraWhenThereAreSeveral() {
-        val one = CameraNotes.summarize(listOf(row("AA:00:00:00:1A:2B", text = "Approve this phone on the camera's screen", ready = false, busy = true)))
+        val one = CameraNotes.summarize(listOf(row("AA:00:00:00:1A:2B", text = "Approve this phone on the camera's screen", ready = false, busy = true, approve = true)))
         assertEquals("Approve this phone on the camera's screen", one.text)
-        val two = CameraNotes.summarize(listOf(row("AA:00:00:00:1A:2B"), row("AA:00:00:00:77:D4", text = "Approve this phone on the camera's screen", ready = false, busy = true)))
+        val two = CameraNotes.summarize(listOf(row("AA:00:00:00:1A:2B"), row("AA:00:00:00:77:D4", text = "Approve this phone on the camera's screen", ready = false, busy = true, approve = true)))
         assertEquals("Approve this phone on the screen of Osmo Nano 77:D4", two.text)
     }
 
@@ -70,6 +70,9 @@ class CameraNotesTest {
         assertEquals("1 of 3 cameras recording. Osmo Nano B is not ready. 1 camera was not ready and has no video.",
             CameraNotes.startNote(3, mapOf("A" to ok, "B" to StartResult.NotReady)))
         assertEquals("Camera did not answer the start command.", CameraNotes.startNote(1, mapOf("A" to StartResult.NoReply)))
+        // a question in the middle keeps its own punctuation and the next problem still starts a new sentence
+        assertEquals("1 of 3 cameras recording. Osmo Nano B refused to record (code D6). Is USB connected? Osmo Nano C is not ready.",
+            CameraNotes.startNote(3, mapOf("A" to ok, "B" to StartResult.Rejected(0xD6, t), "C" to StartResult.NotReady)))
     }
 
     @Test

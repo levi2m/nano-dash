@@ -66,7 +66,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.nanodash.core.watch.CameraState
+import dev.nanodash.core.palette.Palette
+import dev.nanodash.core.watch.WatchCamera
 import dev.nanodash.core.watch.GpsState
 import dev.nanodash.core.watch.RideState
 import dev.nanodash.core.watch.WatchCommand
@@ -79,15 +80,15 @@ import kotlinx.coroutines.launch
 /** The phone app's tokens on true black, as in docs/WEAR_UI.md. */
 private object Tokens {
     val ground = Color(0xFF000000)
-    val surface = Color(0xFF232325)
-    val text = Color(0xFFEDEDED)
-    val textSecondary = Color(0xFFA1A1A6)
-    val textMuted = Color(0xFF85858B)
-    val accent = Color(0xFFFF7A1A)
+    val surface = Color(Palette.RAISED)
+    val text = Color(Palette.TEXT)
+    val textSecondary = Color(Palette.TEXT_SECONDARY)
+    val textMuted = Color(Palette.TEXT_MUTED)
+    val accent = Color(Palette.ACCENT)
     val onAccent = Color(0xFF000000)
-    val ok = Color(0xFF4CC38A)
-    val warn = Color(0xFFE3B341)
-    val bad = Color(0xFFF2575C)
+    val ok = Color(Palette.OK)
+    val warn = Color(Palette.WARN)
+    val bad = Color(Palette.BAD)
 }
 
 private const val HOLD_MS = 1_200f
@@ -173,13 +174,13 @@ private fun refusalText(reason: String): Pair<String, String> = when (reason) {
 }
 
 @Composable
-private fun Ready(camera: CameraState, onStart: () -> Unit) {
+private fun Ready(camera: WatchCamera,onStart: () -> Unit) {
     Box(Modifier.fillMaxSize().semantics { paneTitle = "Ready" }) {
         Box(Modifier.align(Alignment.TopCenter).padding(top = 30.dp).padding(horizontal = 36.dp)) {
             when (camera) {
-                CameraState.Ready, CameraState.Recording -> StatusDot(Tokens.ok, "Camera ready")
-                CameraState.Problem -> StatusDot(Tokens.bad, "Camera problem")
-                CameraState.None -> StatusDot(Tokens.textMuted, "No camera")
+                WatchCamera.Ready, WatchCamera.Recording -> StatusDot(Tokens.ok, "Camera ready")
+                WatchCamera.Problem -> StatusDot(Tokens.bad, "Camera problem")
+                WatchCamera.None -> StatusDot(Tokens.textMuted, "No camera")
             }
         }
         Box(Modifier.align(Alignment.Center)) { Hero("Ready", LiveRegionMode.Polite) }
@@ -203,10 +204,10 @@ private fun Recording(state: WatchState, onTick: () -> Unit, onStop: () -> Unit)
                 GpsState.Off -> StatusDot(Tokens.textMuted, "GPS off")
             }
             when (state.camera) {
-                CameraState.Recording -> StatusDot(Tokens.ok, "Camera recording")
-                CameraState.Ready -> StatusDot(Tokens.ok, "Camera ready")
-                CameraState.Problem -> StatusDot(Tokens.bad, "Camera problem")
-                CameraState.None -> StatusDot(Tokens.textMuted, "No camera")
+                WatchCamera.Recording -> StatusDot(Tokens.ok, "Camera recording")
+                WatchCamera.Ready -> StatusDot(Tokens.ok, "Camera ready")
+                WatchCamera.Problem -> StatusDot(Tokens.bad, "Camera problem")
+                WatchCamera.None -> StatusDot(Tokens.textMuted, "No camera")
             }
         }
         // One spoken node (merged) instead of the description plus the digits, and a heading as the landmark.

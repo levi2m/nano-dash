@@ -28,7 +28,7 @@ class WatchLink(
     private val allowedAddress: () -> String?,
     private val handler: WatchHandler,
     /** Called each time the chosen watch completes the handshake, so the app can show that the watch app has been seen. */
-    private val onWatchSeen: () -> Unit = {},
+    private val onWatchSeen: () -> Unit,
 ) {
     @Volatile private var running = false
     @Volatile private var server: BluetoothServerSocket? = null
@@ -70,7 +70,7 @@ class WatchLink(
                 val srv = adapter.listenUsingRfcommWithServiceRecord("Nano Dash", UUID.fromString(WatchProtocol.SERVICE_UUID))
                 server = srv
                 if (!running) { srv.close(); return }   // stop() ran before the server was visible to it, so it could not close it
-                val socket = srv.accept()          // blocks until a paired device connects, or stop() closes the server
+                val socket = srv.accept()
                 srv.close()
                 client = socket
                 if (!running) return                // stop() ran while the connection was being accepted
@@ -78,10 +78,10 @@ class WatchLink(
             } catch (e: IOException) {
                 if (running) {
                     try { Thread.sleep(2_000) }    // Bluetooth off or busy: try again shortly instead of spinning
-                    catch (ie: InterruptedException) { return }   // stop() asked us to end
+                    catch (ie: InterruptedException) { return }
                 }
             } catch (e: InterruptedException) {
-                return                             // stop() asked us to end
+                return
             } catch (e: SecurityException) {
                 running = false                    // the Bluetooth permission was refused: LoggerService starts a new link when it is back
                 return
@@ -112,7 +112,7 @@ class WatchLink(
         while (running) {
             val line = input.readLine() ?: return
             if (address != allowedAddress()) return                                // the rider chose another watch meanwhile: cut this one
-            val command = WatchProtocol.parseCommand(line) ?: continue             // unknown lines are ignored
+            val command = WatchProtocol.parseCommand(line) ?: continue
             send(handler.onCommand(command))
         }
     }

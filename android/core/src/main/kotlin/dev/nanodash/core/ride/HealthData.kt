@@ -11,7 +11,6 @@ data class HeartRateReading(val utcMillis: Long, val bpm: Int)
  * time, like every other ride file. The app writes it after the ride, from Health Connect; nothing here touches Android or the network.
  */
 object HealthCsv {
-    const val FILE = "health.csv"
     private const val HEADER = "utc_ms,heart_rate_bpm"
 
     /** The lowest and highest rates kept. A reading outside this range is a sensor glitch, not a heart rate. */

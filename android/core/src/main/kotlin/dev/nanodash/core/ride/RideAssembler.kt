@@ -21,6 +21,8 @@ data class GnssFix(
     val verticalAccuracyM: Float? = null,
     /** The phone's monotonic clock when the fix was made, to compare the phone's UTC clock with the GPS's. */
     val elapsedNs: Long? = null,
+    val speedAccuracyMps: Float? = null,
+    val bearingAccuracyDeg: Float? = null,
 )
 
 object GeoMath {

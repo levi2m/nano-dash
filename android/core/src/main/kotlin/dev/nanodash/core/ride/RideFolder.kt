@@ -40,26 +40,29 @@ object RideFolder {
     fun readTextCapped(file: File, maxBytes: Long = MAX_TEXT_BYTES): String? =
         if (file.isFile && file.length() <= maxBytes) file.readText() else null
 
-    private val SHARED = listOf("gnss.csv", "imu.csv", "events.jsonl", "meta.json", HealthCsv.FILE)
-    private val START = Regex("\"start_utc_ms\"\\s*:\\s*(\\d+)")
-    private val END = Regex("\"end_utc_ms\"\\s*:\\s*(\\d+)")
-    private val FIXES = Regex("\"gnss_fixes\"\\s*:\\s*(\\d+)")
+    private val SHARED = listOf(RideLog.GNSS, RideLog.IMU, RideLog.EVENTS, RideLog.META, RideLog.HEALTH)
+    private val START = Regex("\"${LogKey.START_UTC_MS}\"\\s*:\\s*(\\d+)")
+    private val END = Regex("\"${LogKey.END_UTC_MS}\"\\s*:\\s*(\\d+)")
+    private val FIXES = Regex("\"${LogKey.GNSS_FIXES}\"\\s*:\\s*(\\d+)")
+
+    private fun rideDirs(root: File): List<File> = root.listFiles { f -> f.isDirectory && f.name.startsWith(RideLog.FOLDER_PREFIX) }?.toList() ?: emptyList()
+
+    private fun gnssFile(dir: File): File? = File(dir, RideLog.GNSS).takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES }
 
     fun fitFiles(dir: File): List<File> =
-        dir.listFiles { f -> f.isFile && f.name.startsWith("ride") && f.name.endsWith(".fit") }?.sortedBy { it.name } ?: emptyList()
+        dir.listFiles { f -> f.isFile && RideLog.isFit(f.name) }?.sortedBy { it.name } ?: emptyList()
 
     /** Newest first. A folder that cannot be read is skipped rather than failing the list. */
     fun list(root: File): List<RideSummary> =
-        root.listFiles { f -> f.isDirectory && f.name.startsWith("ride-") }
-            ?.sortedByDescending { it.name }?.mapNotNull { runCatching { summarize(it) }.getOrNull() } ?: emptyList()
+        rideDirs(root).sortedByDescending { it.name }.mapNotNull { runCatching { summarize(it) }.getOrNull() }
 
     fun summarize(dir: File): RideSummary {
-        val meta = readTextCapped(File(dir, "meta.json")).orEmpty()
+        val meta = readTextCapped(File(dir, RideLog.META)).orEmpty()
         val start = START.find(meta)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
         val end = END.find(meta)?.groupValues?.get(1)?.toLongOrNull()        // null while recording and for a ride that was cut off
         val track = trackOf(dir, finished = end != null, metaFixes = FIXES.find(meta)?.groupValues?.get(1)?.toIntOrNull())
 
-        val clips = RideRecovery.clipSpansFromEvents(readTextCapped(File(dir, "events.jsonl")))
+        val clips = RideRecovery.clipSpansFromEvents(readTextCapped(File(dir, RideLog.EVENTS)))
             .map { (it.endUtcMillis - it.startUtcMillis) / 1000.0 }
         val fits = fitFiles(dir)
         val files = fits + SHARED.map { File(dir, it) }.filter { it.exists() }
@@ -76,7 +79,7 @@ object RideFolder {
             sizeKb = files.sumOf { it.length() } / 1024,
             route = track.route,
             files = files,
-            heartRateReadings = HealthCsv.count(File(dir, HealthCsv.FILE)),
+            heartRateReadings = HealthCsv.count(File(dir, RideLog.HEALTH)),
         )
     }
 
@@ -87,8 +90,8 @@ object RideFolder {
      * distance was kept is read again from the log while that still exists, otherwise its missing figures stay unknown.
      */
     private fun trackOf(dir: File, finished: Boolean, metaFixes: Int?): Track {
-        val cache = File(dir, "route.txt")
-        val gnss = File(dir, "gnss.csv").takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES }
+        val cache = File(dir, RideLog.ROUTE_CACHE)
+        val gnss = gnssFile(dir)
         if (finished && metaFixes != null && cache.exists() && cache.length() <= MAX_TEXT_BYTES) {
             val lines = cache.readLines()
             val header = lines.firstOrNull()?.takeIf { it.startsWith("gap=") }?.split(';')
@@ -103,7 +106,7 @@ object RideFolder {
             if (dist != null || gnss == null) return Track(metaFixes, header["gap"]?.toLongOrNull(), dist, header["top"]?.toFloatOrNull(), route)
         }
         gnss ?: return Track(0, null, null, null, emptyList())
-        val fixes = RideRecovery.parseGnssCsv(gnss.readText())   // size checked above
+        val fixes = GnssCsv.parse(gnss.readText())
         val step = maxOf(1, fixes.size / MAX_ROUTE_POINTS)
         val route = fixes.filterIndexed { i, _ -> i % step == 0 || i == fixes.lastIndex }.map { it.latitudeDeg to it.longitudeDeg }
         val gap = longestGapSeconds(fixes)
@@ -128,8 +131,8 @@ object RideFolder {
      * health readings. Null when the ride has no fixes.
      */
     fun fixWindow(dir: File, marginMs: Long = 0): Pair<Long, Long>? {
-        val gnss = File(dir, "gnss.csv").takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES } ?: return null
-        val times = RideRecovery.parseGnssCsv(gnss.readText()).map { it.utcMillis }
+        val gnss = gnssFile(dir) ?: return null
+        val times = GnssCsv.parse(gnss.readText()).map { it.utcMillis }
         if (times.isEmpty()) return null
         return (times.min() - marginMs) to (times.max() + marginMs)
     }
@@ -137,15 +140,15 @@ object RideFolder {
     /** Stores the readings as `health.csv` (replacing an earlier import) and does not touch the .fit; call [rebuildFit] after. */
     fun saveHealth(dir: File, readings: List<HeartRateReading>) {
         val kept = HealthCsv.clean(readings)
-        if (kept.isEmpty()) File(dir, HealthCsv.FILE).delete()
-        else writeAtomically(File(dir, HealthCsv.FILE), HealthCsv.write(kept).toByteArray())
+        if (kept.isEmpty()) File(dir, RideLog.HEALTH).delete()
+        else writeAtomically(File(dir, RideLog.HEALTH), HealthCsv.write(kept).toByteArray())
     }
 
     /** Rebuilds every .fit from the logged fixes (for a ride that was interrupted, or after the writer improved), with the ride's health readings and sport. */
     fun rebuildFit(dir: File): Boolean {
-        val gnss = File(dir, "gnss.csv").takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES } ?: return false
-        val events = readTextCapped(File(dir, "events.jsonl"))
-        val fits = RideRecovery.rebuildFits(gnss.readText(), events, readTextCapped(File(dir, HealthCsv.FILE))) ?: return false
+        val gnss = gnssFile(dir) ?: return false
+        val events = readTextCapped(File(dir, RideLog.EVENTS))
+        val fits = RideRecovery.rebuildFits(gnss.readText(), events, readTextCapped(File(dir, RideLog.HEALTH))) ?: return false
         val keep = fits.map { it.fileName }.toSet()
         fits.forEach { writeAtomically(File(dir, it.fileName), it.bytes) }
         fitFiles(dir).filter { it.name !in keep }.forEach { it.delete() }   // old files go only after the new ones are in place
@@ -166,17 +169,17 @@ object RideFolder {
 
     /** Writes the ride's track to [out] as GPX so a map app can show it. False when the ride has no GPS fixes. */
     fun writeGpx(dir: File, out: File): Boolean {
-        val gnss = File(dir, "gnss.csv").takeIf { it.exists() && it.length() <= MAX_TEXT_BYTES } ?: return false
-        val fixes = RideRecovery.parseGnssCsv(gnss.readText()).takeIf { it.isNotEmpty() } ?: return false
+        val gnss = gnssFile(dir) ?: return false
+        val fixes = GnssCsv.parse(gnss.readText()).takeIf { it.isNotEmpty() } ?: return false
         out.writeText(Gpx.write(dir.name, fixes))
         return true
     }
 
     /** Packs every ride's files into one zip (`<ride folder>/<file>`) so uninstalling the app does not lose the rides. Returns the ride count. */
     fun zipAll(root: File, out: File): Int {
-        val dirs = root.listFiles { f -> f.isDirectory && f.name.startsWith("ride-") }?.sortedBy { it.name } ?: emptyList()
+        val dirs = rideDirs(root).sortedBy { it.name }
         ZipOutputStream(out.outputStream().buffered()).use { zip ->
-            for (dir in dirs) for (f in dir.listFiles { f -> f.isFile && f.name != "route.txt" }?.sortedBy { it.name }.orEmpty()) {   // route.txt is only a cache
+            for (dir in dirs) for (f in dir.listFiles { f -> f.isFile && f.name != RideLog.ROUTE_CACHE }?.sortedBy { it.name }.orEmpty()) {
                 zip.putNextEntry(ZipEntry("${dir.name}/${f.name}"))
                 f.inputStream().use { it.copyTo(zip) }
                 zip.closeEntry()

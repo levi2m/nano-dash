@@ -15,8 +15,7 @@ class SpeedUnitTest {
 
     @Test
     fun aHundredKilometresAnHourIsAboutSixtyTwoMiles() {
-        val mps = 100 / SpeedUnit.Metric.speedPerMps
-        assertEquals(62.1, mps * SpeedUnit.Imperial.speedPerMps, 0.05)
+        assertEquals(62.1, 27.78 * SpeedUnit.Imperial.speedPerMps, 0.05)   // 27.78 m/s is 100 km/h
     }
 
     @Test

@@ -14,6 +14,7 @@ import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.ListenableFuture
+import dev.nanodash.core.palette.Palette
 
 /**
  * One swipe from the watch face to the remote: a single round "Track" button that opens the app.
@@ -36,7 +37,7 @@ class RideTile : TileService() {
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setClickable(open)
-                    .setBackground(ModifiersBuilders.Background.Builder().setColor(argb(0xFFFF7A1A.toInt())).setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(48f)).build()).build())
+                    .setBackground(ModifiersBuilders.Background.Builder().setColor(argb(Palette.ACCENT.toInt())).setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(48f)).build()).build())
                     .setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription("Open Nano Dash to start or stop a track").build())
                     .build(),
             )
@@ -48,7 +49,7 @@ class RideTile : TileService() {
             .addContent(
                 LayoutElementBuilders.Column.Builder()
                     .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-                    .addContent(text("Nano Dash", 14f, 0xFFA1A1A6.toInt(), bold = false))
+                    .addContent(text("Nano Dash", 14f, Palette.TEXT_SECONDARY.toInt(), bold = false))
                     .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(8f)).build())
                     .addContent(button)
                     .build(),

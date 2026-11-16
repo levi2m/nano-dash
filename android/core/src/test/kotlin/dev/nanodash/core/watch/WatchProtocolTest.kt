@@ -28,10 +28,10 @@ class WatchProtocolTest {
 
     @Test
     fun aStateSurvivesEncodingAndDecoding() {
-        val s = WatchState(RideState.Recording, 754, GpsState.Fix, CameraState.Ready)
+        val s = WatchState(RideState.Recording, 754, GpsState.Fix, WatchCamera.Ready)
         assertEquals("STATE recording 754 fix ready", WatchProtocol.encode(s))
         assertEquals(s, WatchProtocol.decode(WatchProtocol.encode(s)))
-        for (ride in RideState.entries) for (gps in GpsState.entries) for (cam in CameraState.entries) {
+        for (ride in RideState.entries) for (gps in GpsState.entries) for (cam in WatchCamera.entries) {
             val x = WatchState(ride, 0, gps, cam)
             assertEquals(x, WatchProtocol.decode(WatchProtocol.encode(x)))
         }

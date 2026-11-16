@@ -115,7 +115,7 @@ class RideFolderTest {
         File(dir, "gnss.csv").writeText(header + rows.joinToString("\n") { (s, lat) -> "${s}000000000,${t0 + s * 1000L},$lat,-40.2,5.0,8.0,0.0,3.0,0.5,2.0,4.0" } + "\n")
         File(dir, "route.txt").delete()
         val card = assertNotNull(RideFolder.summarize(dir).distanceM)
-        val fit = RideAssembler().assemble(RideRecovery.parseGnssCsv(File(dir, "gnss.csv").readText())).last().distanceM
+        val fit = RideAssembler().assemble(GnssCsv.parse(File(dir, "gnss.csv").readText())).last().distanceM
         assertEquals(fit.toDouble(), card, 0.01)
         assertTrue(card < 300.0, "the 5.3 km jump across the gap must not count: $card")
     }

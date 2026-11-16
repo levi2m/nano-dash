@@ -3,6 +3,7 @@ package dev.nanodash.core.ride
 import dev.nanodash.core.camera.CameraTiming
 import dev.nanodash.core.fit.CameraSpan
 import dev.nanodash.core.fit.FitTime
+import dev.nanodash.core.fit.ParsedFit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -15,11 +16,11 @@ class RideRecoveryTest {
     private fun csv(vararg rows: String) = header + rows.joinToString("\n") + "\n"
 
     private fun rebuildFit(gnssCsv: String, eventsJsonl: String? = null, shiftMs: Long = CameraTiming.FIT_SHIFT_MS): ByteArray? =
-        RideRecovery.buildFit(RideRecovery.parseGnssCsv(gnssCsv), RideRecovery.clipSpansFromEvents(eventsJsonl), shiftMs)?.bytes
+        RideRecovery.buildFit(GnssCsv.parse(gnssCsv), RideRecovery.clipSpansFromEvents(eventsJsonl), shiftMs)?.bytes
 
     @Test
     fun parsesTheLoggersCsvIncludingEmptyFields() {
-        val fixes = RideRecovery.parseGnssCsv(
+        val fixes = GnssCsv.parse(
             csv(
                 "100,1793676577000,-20.265,-40.295,5.5,12.5,90.0,3.0,0.4,2.0",
                 "200,1793676578000,-20.2651,-40.2951,,,,,,",
@@ -35,7 +36,7 @@ class RideRecoveryTest {
 
     @Test
     fun skipsBadLinesInsteadOfFailing() {
-        val fixes = RideRecovery.parseGnssCsv(csv("garbage", "1,notanumber,1,2,3,4,5,6,7,8", "1,1793676577000,-20.0,-40.0,1,2,3,4,5,6"))
+        val fixes = GnssCsv.parse(csv("garbage", "1,notanumber,1,2,3,4,5,6,7,8", "1,1793676577000,-20.0,-40.0,1,2,3,4,5,6"))
         assertEquals(1, fixes.size)
     }
 
@@ -43,16 +44,6 @@ class RideRecoveryTest {
     fun aHeaderOnlyLogGivesNoFit() {
         assertNull(rebuildFit(header))
         assertNull(rebuildFit(""))
-    }
-
-    @Test
-    fun rebuildsAFitFromFixes() {
-        val rows = (0 until 30).map { i ->
-            "${i * 1_000_000_000L},${1793676577000L + i * 1000L},${-20.265 + i * 0.0001},-40.295,5.0,10.0,0.0,3.0,0.5,2.0"
-        }
-        val fit = assertNotNull(rebuildFit(csv(*rows.toTypedArray())))
-        assertEquals(".FIT", String(fit, 8, 4, Charsets.US_ASCII))
-        assertTrue(fit.size > 200)
     }
 
     @Test
@@ -69,7 +60,7 @@ class RideRecoveryTest {
     private fun clipLine(camera: String, shift: Long, start: Long) =
         """{"event":"camera_stop","camera":"$camera","fit_shift_ms":$shift,"clip_span_estimate_utc_ms":[$start,${start + 3000}]}"""
 
-    private val fixes5 get() = RideRecovery.parseGnssCsv(fiveSeconds)
+    private val fixes5 get() = GnssCsv.parse(fiveSeconds)
 
     @Test
     fun camerasWithTheSameClockOffsetShareOneFile() {
@@ -133,15 +124,12 @@ class RideRecoveryTest {
     }
 
     private val t0 = 1793676577000L
+    private val FILE_ID = 0
+    private val TIME_CREATED = 4
     private val fiveSeconds = csv(*(0 until 5).map { "${it},${t0 + it * 1000L},-20.2,-40.2,5.0,8.0,0.0,3.0,0.5,2.0" }.toTypedArray())
 
-    /** file_id's time_created sits at a fixed place: header (14) + definition (3 + 2 + 1 + 4 * 3 = 18) + header byte + 1 + 2 + 2 bytes. */
-    private fun timeCreated(fit: ByteArray): Long {
-        val off = 14 + 18 + 1 + 1 + 2 + 2
-        var v = 0L
-        for (i in 0 until 4) v = v or ((fit[off + i].toLong() and 0xFF) shl (8 * i))
-        return v
-    }
+    /** The file_id message's time_created (field 4), read back by the independent FIT reader. */
+    private fun timeCreated(fit: ByteArray): Long = ParsedFit.u(ParsedFit(fit).of(FILE_ID).single().fields.getValue(TIME_CREATED), 0, 4)
 
     @Test
     fun fitTimesAreShiftedOntoTheCamerasClockByDefault() {
@@ -157,7 +145,7 @@ class RideRecoveryTest {
 
     @Test
     fun theCameraWindowIsShiftedWithTheRecords() {
-        val fixes = RideRecovery.parseGnssCsv(fiveSeconds)
+        val fixes = GnssCsv.parse(fiveSeconds)
         val span = CameraSpan(t0 + 1_000, t0 + 3_000)
         val built = assertNotNull(RideRecovery.buildFit(fixes, listOf(span)))
         assertEquals(5, built.samples)

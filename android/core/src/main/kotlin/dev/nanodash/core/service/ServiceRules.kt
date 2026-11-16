@@ -1,7 +1,6 @@
 package dev.nanodash.core.service
 
 import dev.nanodash.core.camera.StartResult
-import dev.nanodash.core.watch.WatchStartRules
 
 /** What the ride service is doing right now: waiting for Quick start ([armed]), recording ([riding]) or writing the files ([saving]). */
 data class ServiceState(val armed: Boolean, val riding: Boolean, val saving: Boolean) {
@@ -23,17 +22,8 @@ sealed interface WatchStartDecision {
  * watch. Pure functions of the service's state, so they are tested in `core`; `LoggerService` only carries them out.
  */
 object ServiceRules {
-    /** A ride may start only when none is recording and the last one has finished writing. */
-    fun canStartRide(s: ServiceState): Boolean = s.idle
-
     /** An intent that is none of Start, Stop, Arm or Disarm never starts anything; it only ends a service that has no reason to run. */
     fun switchOffOnStrayIntent(s: ServiceState): Boolean = !s.armed && s.idle
-
-    /** Disarming while a ride records or saves must leave the service running: it switches itself off when that ride is done. */
-    fun switchOffOnDisarm(s: ServiceState): Boolean = s.idle
-
-    /** Arming shows the "ready" notification only when no ride is recording or saving, so it never replaces the ride's own. */
-    fun showReadyOnArm(s: ServiceState): Boolean = s.idle
 
     /** A Stop with no ride: switch off unless Quick start keeps the service up, and never under a ride that is still being written. */
     fun switchOffOnStopWithoutRide(s: ServiceState): Boolean = !s.saving && !s.armed
@@ -46,8 +36,12 @@ object ServiceRules {
     fun watchStart(s: ServiceState, stopPending: Boolean, hasLocationPermission: Boolean, gpsOn: Boolean): WatchStartDecision {
         if (stopPending) return WatchStartDecision.Refuse("busy")
         if (s.riding && !s.saving) return WatchStartDecision.AlreadyRiding
-        val reason = WatchStartRules.refusal(s.saving, hasLocationPermission, gpsOn) ?: return WatchStartDecision.Go
-        return WatchStartDecision.Refuse(reason)
+        return when {
+            s.saving -> WatchStartDecision.Refuse("busy")
+            !hasLocationPermission -> WatchStartDecision.Refuse("no-permission")
+            !gpsOn -> WatchStartDecision.Refuse("gps-off")
+            else -> WatchStartDecision.Go
+        }
     }
 
     /**

@@ -128,5 +128,11 @@ class CameraLink(
         const val FIRST_RETRY_MS = 1_000L
         const val MAX_RETRY_MS = 10_000L
         const val RECONNECT_WAIT_MS = 12_000L
+
+        /** How long a ride's end waits for a start command that is still in flight (the reply wait plus the recording-flag wait, with room to spare). */
+        const val START_BUDGET_MS = 15_000L
+
+        /** How long a ride's end waits for every camera to stop: a link that dropped may take up to 2 x [RECONNECT_WAIT_MS] to come back, and the stop itself up to 15 s. */
+        const val STOP_BUDGET_MS = 45_000L
     }
 }

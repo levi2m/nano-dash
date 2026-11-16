@@ -47,11 +47,9 @@ class FitActivityWriter {
 
         val w = FitWriter()
 
-        // file_id
         w.define(L_FILE_ID, 0, listOf(Field(0, 1, BT_ENUM), Field(1, 2, BT_UINT16), Field(2, 2, BT_UINT16), Field(4, 4, BT_UINT32)))
         w.data(L_FILE_ID) { u8(FILE_TYPE_ACTIVITY); u16(MANUFACTURER_DEVELOPMENT); u16(1); u32(start) }
 
-        // developer data: one application id, four fields
         w.define(L_DEV_DATA_ID, 207, listOf(Field(1, 16, BT_BYTE), Field(3, 1, BT_UINT8)))
         w.data(L_DEV_DATA_ID) { bytes(APP_ID, 16); u8(0) }
         w.define(
@@ -62,7 +60,6 @@ class FitActivityWriter {
             w.data(L_FIELD_DESC) { u8(0); u8(num); u8(type); string(name, 32); string(units, 16) }
         }
 
-        // records
         w.define(
             L_RECORD, 20,
             listOf(
@@ -96,7 +93,6 @@ class FitActivityWriter {
             }
         }
 
-        // session
         val maxSpeed = sorted.maxOf { it.speedMps }
         val avgSpeed = if (elapsedMs > 0) last.distanceM / (elapsedMs / 1000f) else 0f
         w.define(
@@ -115,7 +111,6 @@ class FitActivityWriter {
             if (hasHeartRate) { u8(heartRates.average().roundToInt().coerceIn(1, 254)); u8(heartRates.max().coerceIn(1, 254)) }
         }
 
-        // activity
         w.define(
             L_ACTIVITY, 34,
             listOf(Field(253, 4, BT_UINT32), Field(0, 4, BT_UINT32), Field(1, 2, BT_UINT16), Field(2, 1, BT_ENUM), Field(3, 1, BT_ENUM), Field(4, 1, BT_ENUM)),
