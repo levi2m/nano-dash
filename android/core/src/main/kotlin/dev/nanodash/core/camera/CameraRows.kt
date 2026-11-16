@@ -20,7 +20,7 @@ data class CameraRow(
 }
 
 /** All cameras in one line: a single camera reads as its own row, several read as counts. */
-data class CameraSummary(val text: String, val ready: Boolean, val busy: Boolean, val error: Boolean, val recording: Boolean?, val awaitingApproval: Boolean = false)
+data class CameraSummary(val text: String, val ready: Boolean, val busy: Boolean, val error: Boolean, val recording: Boolean?)
 
 /** The words the rider reads about the cameras and about a ride's start and stop. Pure functions, so they are tested in `core`. */
 object CameraNotes {
@@ -35,7 +35,6 @@ object CameraNotes {
             ready = rows.all { it.ready },
             busy = rows.any { it.busy },
             error = rows.any { it.error },
-            awaitingApproval = rows.any { it.awaitingApproval },
             recording = if (rows.any { it.recording == true }) true else if (rows.all { it.recording == false }) false else null,
         )
     }

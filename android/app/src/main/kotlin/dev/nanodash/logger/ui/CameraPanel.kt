@@ -80,7 +80,7 @@ internal fun CameraPanel(
         val approve = cam.awaitingApproval
         val shown = when {
             cam.ready -> if (cam.rows.size > 1) "All ready to start and stop with the track" else "Ready to start and stop with the track"
-            cam.rows.isEmpty() -> "No camera is connected, so a track now would have no video. Turn the camera on, make sure wireless connection is enabled on it, close Mimo on the phone, then connect."
+            cam.rows.isEmpty() && !cam.error -> "No camera is connected, so a track now would have no video. Turn the camera on, make sure wireless connection is enabled on it, close Mimo on the phone, then connect."
             else -> caption(cam.text)
         }
         Text(

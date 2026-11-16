@@ -31,13 +31,14 @@ data class CameraUi(
     val recording: Boolean? = null,
     /** True when a camera could not be reached or its link was lost, so the screen can show it as a problem. */
     val error: Boolean = false,
-    val awaitingApproval: Boolean = false,
     val rows: List<CameraRow> = emptyList(),
     val choosing: Boolean = false,
     val scanning: Boolean = false,
     val found: List<String> = emptyList(),
     val selected: Set<String> = emptySet(),
-)
+) {
+    val awaitingApproval: Boolean get() = rows.any { it.awaitingApproval }
+}
 
 object SystemClocks : Clock {
     override fun utcMillis() = System.currentTimeMillis()
@@ -126,13 +127,15 @@ object CameraController {
         }
     }
 
-    private fun rowFor(row: CameraRow, st: CameraState): CameraRow = when (st) {
-        CameraState.Pairing -> row.copy(text = "Pairing", ready = false, busy = true, error = false, awaitingApproval = false)
-        CameraState.AwaitingApproval -> row.copy(text = "Approve this phone on the camera's screen", ready = false, busy = true, error = false, awaitingApproval = true)
-        CameraState.Waking -> row.copy(text = "Waking the camera", ready = false, busy = true, error = false, awaitingApproval = false)
-        CameraState.Ready -> row.copy(text = "Camera ready", ready = true, busy = false, error = false, awaitingApproval = false, clockSet = clockSet(row.address))
-        CameraState.Reconnecting -> row.copy(text = "Camera lost, reconnecting", ready = false, busy = true, error = true, awaitingApproval = false)
-        is CameraState.Failed -> row.copy(text = st.reason, ready = false, busy = false, error = true, awaitingApproval = false)
+    private fun rowFor(row: CameraRow, st: CameraState): CameraRow = rowText(row, st).copy(awaitingApproval = st == CameraState.AwaitingApproval)
+
+    private fun rowText(row: CameraRow, st: CameraState): CameraRow = when (st) {
+        CameraState.Pairing -> row.copy(text = "Pairing", ready = false, busy = true, error = false)
+        CameraState.AwaitingApproval -> row.copy(text = "Approve this phone on the camera's screen", ready = false, busy = true, error = false)
+        CameraState.Waking -> row.copy(text = "Waking the camera", ready = false, busy = true, error = false)
+        CameraState.Ready -> row.copy(text = "Camera ready", ready = true, busy = false, error = false, clockSet = clockSet(row.address))
+        CameraState.Reconnecting -> row.copy(text = "Camera lost, reconnecting", ready = false, busy = true, error = true)
+        is CameraState.Failed -> row.copy(text = st.reason, ready = false, busy = false, error = true)
         CameraState.Disconnected -> if (row.ready) row.copy(text = "Camera disconnected", ready = false, error = true) else row
     }
 
@@ -146,9 +149,9 @@ object CameraController {
         synchronized(rows) {
             val list = rows.values.toList()
             val base = change(_ui.value)
-            _ui.value = if (list.isEmpty()) base.copy(rows = emptyList(), ready = false, busy = false, recording = null, awaitingApproval = false)
+            _ui.value = if (list.isEmpty()) base.copy(rows = emptyList(), ready = false, busy = false, recording = null)
             else CameraNotes.summarize(list).let { s ->
-                base.copy(rows = list, text = s.text, ready = s.ready, busy = s.busy, error = s.error, awaitingApproval = s.awaitingApproval, recording = s.recording)
+                base.copy(rows = list, text = s.text, ready = s.ready, busy = s.busy, error = s.error, recording = s.recording)
             }
         }
     }
