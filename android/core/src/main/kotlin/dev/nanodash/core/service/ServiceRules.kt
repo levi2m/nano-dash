@@ -22,6 +22,15 @@ sealed interface WatchStartDecision {
  * watch. Pure functions of the service's state, so they are tested in `core`; `LoggerService` only carries them out.
  */
 object ServiceRules {
+    /** A ride may start only when none is recording and the last one has finished writing. */
+    fun canStartRide(s: ServiceState): Boolean = s.idle
+
+    /** Disarming while a ride records or saves must leave the service running: it switches itself off when that ride is done. */
+    fun switchOffOnDisarm(s: ServiceState): Boolean = s.idle
+
+    /** Arming shows the "ready" notification only when no ride is recording or saving, so it never replaces the ride's own. */
+    fun showReadyOnArm(s: ServiceState): Boolean = s.idle
+
     /** An intent that is none of Start, Stop, Arm or Disarm never starts anything; it only ends a service that has no reason to run. */
     fun switchOffOnStrayIntent(s: ServiceState): Boolean = !s.armed && s.idle
 

@@ -56,8 +56,6 @@ import dev.nanodash.core.ride.RideRecovery
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -176,14 +174,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private fun arm() {
         armed = true
         ensureChannel()
-        if (serviceState().idle) showArmed()
+        if (ServiceRules.showReadyOnArm(serviceState())) showArmed()
         startWatchLink()   // also the retry point: the app calls arm on every launch, so a link that died for a missing permission is replaced
     }
 
     private fun disarm() {
         armed = false
         stopWatchLink()
-        if (serviceState().idle) {
+        if (ServiceRules.switchOffOnDisarm(serviceState())) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -269,7 +267,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     @SuppressLint("MissingPermission", "InlinedApi")
     private fun startRide() {
         startPending = false
-        if (!serviceState().idle) return
+        if (!ServiceRules.canStartRide(serviceState())) return
         writeFailed = false
         ensureChannel()
         // Must follow startForegroundService() within a few seconds, so do it before anything else.
@@ -348,7 +346,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                 RideStore.update { it.copy(cameraNote = Note("Starting the camera", problem = false)) }
                 withContext(NonCancellable) { recordStarts(s, CameraController.startRecording()) }
             }
-            CameraController.ui.map { ui -> ui.rows.filter { it.ready }.map { it.address }.toSet() }.distinctUntilChanged().collect { ready ->
+            CameraController.readyAddresses.collect { ready ->
                 val late = ready - s.cameras.keys
                 if (late.isNotEmpty()) withContext(NonCancellable) { recordStarts(s, CameraController.startRecording(late)) }
             }
@@ -382,7 +380,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         stopPending = false
         val s = session
         if (s == null) {
-            if (ServiceRules.switchOffOnStopWithoutRide(serviceState())) stopSelf()
+            if (ServiceRules.switchOffOnStopWithoutRide(serviceState())) stopSelf()   // a Stop during saving must not switch the service off under the writer
             return
         }
         session = null
@@ -419,6 +417,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         // Stop the cameras first so the clips end with the ride. Cancelling the start job waits for a start command in flight.
         val spans = LinkedHashMap<String, CameraSpan>()
         val clips = ArrayList<RideRecovery.CameraClip>()
+        val lags = HashMap<String, Long>()                       // each camera's clock lag, read once so events.jsonl and meta.json agree
         val toStop = runBlocking {
             withTimeoutOrNull(CameraLink.START_BUDGET_MS) { s.cameraJob?.cancelAndJoin() }
             ServiceRules.camerasToStop(s.cameras, CameraController.ui.value.rows.associate { it.address to it.recording })
@@ -444,7 +443,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                     continue
                 }
                 val span = CameraTiming.clipSpan(start, stop)
-                val shift = CameraTiming.fitShiftMs(CameraController.clockSet(address)) + (skewMs ?: 0)
+                val lag = CameraTiming.fitShiftMs(CameraController.clockSet(address)).also { lags[address] = it }
+                val shift = lag + (skewMs ?: 0)
                 if (span != null) { spans[address] = span; clips += RideRecovery.CameraClip(cameraLabel(address), span, shift, skewMs ?: 0) }
                 s.event(
                     JSONObject().put("event", "camera_stop").put(LogKey.CAMERA, cameraLabel(address))
@@ -477,7 +477,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         } catch (e: Exception) {
             message = Note("Could not write the track: ${e.message}")
         }
-        writeMeta(s, endUtc, written, samples, spans)
+        writeMeta(s, endUtc, written, samples, spans, lags)
         RideStore.update { it.copy(message = message) }
     }
 
@@ -550,11 +550,11 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         super.onDestroy()
     }
 
-    private fun writeMeta(s: Session, endUtc: Long?, fitWritten: Boolean, samples: Int, spans: Map<String, CameraSpan>) {
+    private fun writeMeta(s: Session, endUtc: Long?, fitWritten: Boolean, samples: Int, spans: Map<String, CameraSpan>, lags: Map<String, Long> = emptyMap()) {
         val cameras = JSONArray(
             s.cameras.map { (address, r) ->
                 JSONObject().put(LogKey.CAMERA, cameraLabel(address)).put("start_result", r::class.simpleName)
-                    .put(LogKey.FIT_SHIFT_MS, CameraTiming.fitShiftMs(CameraController.clockSet(address)))
+                    .put(LogKey.FIT_SHIFT_MS, lags[address] ?: CameraTiming.fitShiftMs(CameraController.clockSet(address)))
                     .put(LogKey.CLIP_SPAN, spanJson(spans[address]))
             },
         )
@@ -657,6 +657,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 
         fun setWatch(context: Context, address: String, name: String) {
             AppPrefs.setWatch(context, address, name)
+            // Authorisation is checked when a watch connects (and on each command), so a device allowed before must be cut now.
             instance?.main?.post { instance?.let { it.watchLink?.dropClient(); if (it.armed) it.startWatchLink() } }
         }
 
