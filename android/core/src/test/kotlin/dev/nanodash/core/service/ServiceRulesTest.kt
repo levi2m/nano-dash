@@ -19,13 +19,20 @@ class ServiceRulesTest {
         ServiceRules.watchStart(s, stopPending, permission, gps)
 
     @Test
-    fun onlyAServiceNeitherRecordingNorSavingIsIdleSoItMayBeDisturbed() {
-        assertTrue(idle.idle)
-        assertTrue(armed.idle)                            // saving just ended, still armed
-        assertFalse(saving.idle)
-        assertFalse(riding.idle)
-        assertEquals(WatchStartDecision.Refuse("busy"), watch(saving))
-        assertEquals(WatchStartDecision.Go, watch(armed))
+    fun disarmingWhileSavingKeepsTheServiceUpUntilTheRideIsWritten() {
+        assertFalse(ServiceRules.switchOffOnDisarm(saving))
+        assertFalse(ServiceRules.switchOffOnDisarm(riding))
+        assertTrue(ServiceRules.switchOffOnDisarm(armed))
+        assertFalse(ServiceRules.showReadyOnArm(saving), "arming during saving must not replace the saving notification")
+        assertTrue(ServiceRules.showReadyOnArm(idle))
+    }
+
+    @Test
+    fun aStartRightAfterSavingEndsIsAllowedButNotBefore() {
+        assertFalse(ServiceRules.canStartRide(saving))
+        assertFalse(ServiceRules.canStartRide(riding))
+        assertTrue(ServiceRules.canStartRide(armed))                            // saving just ended, still armed
+        assertTrue(ServiceRules.canStartRide(idle))
     }
 
     @Test
