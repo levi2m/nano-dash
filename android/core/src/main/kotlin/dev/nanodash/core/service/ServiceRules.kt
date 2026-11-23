@@ -61,6 +61,12 @@ object ServiceRules {
     fun camerasToStop(results: Map<String, StartResult>, recordingFlags: Map<String, Boolean?>): Set<String> =
         results.filter { (address, r) -> r is StartResult.Started || (r is StartResult.NoReply && recordingFlags[address] == true) }.keys
 
+    /**
+     * The cameras to start now that the ride is under way: those that look ready and have not been tried yet. A camera that was
+     * tried and answered (even with nothing) is not asked again, because a second start could end a clip that is already running.
+     */
+    fun lateCameras(ready: Set<String>, tried: Set<String>): Set<String> = ready - tried
+
     /** Null when no camera needed the extra stop; otherwise what to tell the rider. */
     fun strayStopNote(untimedStopped: List<String>): String? = when (untimedStopped.size) {
         0 -> null

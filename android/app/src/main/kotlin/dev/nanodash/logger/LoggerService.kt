@@ -89,7 +89,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     private lateinit var sensorManager: SensorManager
     private var thread: HandlerThread? = null
     @Volatile private var session: Session? = null
-    private var wakeLock: PowerManager.WakeLock? = null
+    @Volatile private var wakeLock: PowerManager.WakeLock? = null
     /** Quick start: the service stays up between rides, showing the Start notification and listening for the watch. */
     @Volatile private var armed = false
     private var watchLink: WatchLink? = null
@@ -108,7 +108,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         val gnss = BufferedWriter(FileWriter(File(dir, RideLog.GNSS)), 1 shl 16)
         val imu = BufferedWriter(FileWriter(File(dir, RideLog.IMU)), 1 shl 17)
         val events = BufferedWriter(FileWriter(File(dir, RideLog.EVENTS)))
-        val fixes = java.util.concurrent.CopyOnWriteArrayList<GnssFix>()   // the finisher thread reads it while the logger thread may still add a last fix
+        val fixes = ArrayList<GnssFix>()   // the logger thread adds; the finisher thread reads only after that thread has ended (see finishRide)
         val imuCounts = HashMap<Int, Long>()
         var imuTotal = 0L
         val line = StringBuilder(96)
@@ -296,14 +296,15 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             return
         }
         session = s
-        writeMeta(s, endUtc = null, fitWritten = false, samples = 0, spans = emptyMap())
+        writeMeta(s, endUtc = null, fitWritten = false, samples = 0, spans = emptyMap())   // a full phone says so and the ride goes on
 
         val t = HandlerThread("ride-logger").also { it.start() }
         thread = t
         val handler = Handler(t.looper)
 
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "nanodash:ride").apply { acquire(MAX_RIDE_MS) }
+        // Not counted, so each acquire only moves the timeout. It is renewed while fixes arrive, so a ride of any length keeps it and a dead service loses it within minutes.
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "nanodash:ride").apply { setReferenceCounted(false); acquire(WAKE_LOCK_MS) }
 
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this, t.looper)
         @Suppress("DEPRECATION")
@@ -341,7 +342,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
                 withContext(NonCancellable) { recordStarts(s, CameraController.startRecording()) }
             }
             CameraController.readyAddresses.collect { ready ->
-                val late = ready - s.cameras.keys
+                val late = ServiceRules.lateCameras(ready, s.cameras.keys)
                 if (late.isEmpty()) return@collect
                 // A camera that looks ready here but is not yet ready for the link answers nothing and stays unstarted: the next state change tries it again.
                 val started = withContext(NonCancellable) { CameraController.startRecording(late) }
@@ -386,7 +387,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         locationManager.unregisterGnssStatusCallback(gnssCallback)
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
-        thread?.quitSafely()
+        val logger = thread
+        logger?.quitSafely()
         thread = null
         // Until the thread below is done, a new ride must not start: its end would switch this service off under the new ride.
         saving = true
@@ -395,7 +397,7 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
 
         Thread {
             try {
-                finishRide(s)
+                finishRide(s, logger)
             } catch (e: Throwable) {
                 RideStore.update { it.copy(message = Note("Could not finish the track: ${e.message}. The GPS log was kept; use Rebuild .fit.")) }
             } finally {
@@ -410,7 +412,9 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
     }
 
     /** Stops the cameras, writes the .fit files and meta.json. Runs on its own thread because the camera stop can take seconds. */
-    private fun finishRide(s: Session) {
+    private fun finishRide(s: Session, logger: HandlerThread?) {
+        // The logger thread still works through events that were already queued. Wait for it, so the lists and counters it filled are complete and safe to read here.
+        logger?.join(LOGGER_JOIN_MS)
         // Stop the cameras first so the clips end with the ride. Cancelling the start job waits for a start command in flight.
         val spans = LinkedHashMap<String, CameraSpan>()
         val clips = ArrayList<RideRecovery.CameraClip>()
@@ -484,10 +488,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             w.append(line)
             if (flush) w.flush()
         } catch (e: IOException) {
-            if (!writeFailed) {
-                writeFailed = true
-                RideStore.update { it.copy(message = Note("Could not write to storage. Is the phone full?")) }
-            }
+            storageFailed()
+        }
+    }
+
+    private fun storageFailed() {
+        if (!writeFailed) {
+            writeFailed = true
+            RideStore.update { it.copy(message = Note("Could not write to storage. Is the phone full?")) }
         }
     }
 
@@ -524,11 +532,14 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             speedAccuracyMps = if (location.hasSpeedAccuracy()) location.speedAccuracyMetersPerSecond else null,
             bearingAccuracyDeg = if (location.hasBearingAccuracy()) location.bearingAccuracyDegrees else null,
         )
-        s.fixes += fix
+        s.fixes.add(fix)
         // Flushed every fix (once a second) so a killed app loses at most the last fix, not the last ten minutes.
         write(s.gnss, GnssCsv.line(fix), flush = true)
         RideStore.update { it.copy(fixes = s.fixes.size, lastSpeedMps = fix.speedMps, lastAccuracyM = fix.horizontalAccuracyM) }
-        if (s.fixes.size % 10 == 0) notify("Recording: ${s.fixes.size} GPS fixes")
+        if (s.fixes.size % 10 == 0) {
+            notify("Recording: ${s.fixes.size} GPS fixes")
+            wakeLock?.acquire(WAKE_LOCK_MS)
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -571,7 +582,11 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             .put(LogKey.CAMERAS, cameras)
             .put(LogKey.FIT_WRITTEN, fitWritten)
             .put(LogKey.FIT_SAMPLES, samples)
-        RideFolder.writeAtomically(File(s.dir, RideLog.META), json.toString(2).toByteArray())
+        try {
+            RideFolder.writeAtomically(File(s.dir, RideLog.META), json.toString(2).toByteArray())
+        } catch (e: IOException) {
+            storageFailed()
+        }
     }
 
     private fun stamp(utcMillis: Long): String =
@@ -635,7 +650,8 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
         const val ACTION_STOP = "dev.nanodash.logger.STOP"
         private const val CHANNEL_ID = "ride"
         private const val NOTIFICATION_ID = 1
-        private const val MAX_RIDE_MS = 8L * 60 * 60 * 1000
+        private const val WAKE_LOCK_MS = 10L * 60 * 1000
+        private const val LOGGER_JOIN_MS = 2_000L
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, LoggerService::class.java).setAction(ACTION_START))
@@ -672,20 +688,4 @@ class LoggerService : Service(), SensorEventListener, LocationListener {
             context.startService(Intent(context, LoggerService::class.java).setAction(ACTION_DISARM))
         }
     }
-}
-
-internal object BuildConfigInfo {
-    fun versionName(context: Context): String =
-        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "unknown"
-
-    /** True when an F-Droid client installed the app: that client updates it, so the GitHub update link is not needed. */
-    @Suppress("DEPRECATION") // getInstallSourceInfo needs API 30, minSdk is 26
-    fun fromFDroid(context: Context): Boolean {
-        val installer = runCatching { context.packageManager.getInstallerPackageName(context.packageName) }.getOrNull() ?: return false
-        return installer.startsWith("org.fdroid.") || installer == "com.looker.droidify" || installer == "com.machiav3lli.fdroid"
-    }
-
-    /** The `versionCode`, which CI sets to the run number that is also the end of the release tag. */
-    fun build(context: Context): Long =
-        runCatching { androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(context.packageName, 0)) }.getOrDefault(0L)
 }

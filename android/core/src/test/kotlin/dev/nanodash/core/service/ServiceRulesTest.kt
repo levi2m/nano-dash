@@ -89,4 +89,12 @@ class ServiceRulesTest {
         assertTrue(ServiceRules.strayStopNote(listOf("Osmo Nano A"))!!.startsWith("Osmo Nano A did not answer"))
         assertTrue(ServiceRules.strayStopNote(listOf("Osmo Nano A", "Osmo Nano B"))!!.contains("Osmo Nano A and Osmo Nano B"))
     }
+
+    @Test
+    fun aCameraThatBecomesReadyLaterIsStartedOnceAndOnlyOnce() {
+        assertEquals(setOf("B"), ServiceRules.lateCameras(ready = setOf("A", "B"), tried = setOf("A")))
+        assertEquals(emptySet(), ServiceRules.lateCameras(ready = setOf("A"), tried = setOf("A")), "a camera that was tried, even without a reply, is not started again")
+        assertEquals(setOf("A"), ServiceRules.lateCameras(ready = setOf("A"), tried = emptySet()))
+        assertEquals(emptySet(), ServiceRules.lateCameras(ready = emptySet(), tried = setOf("A")))
+    }
 }
